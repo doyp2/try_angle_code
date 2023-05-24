@@ -13,9 +13,7 @@ import android.hardware.camera2.CameraManager
 import android.media.ImageReader
 import android.os.Handler
 import android.os.HandlerThread
-import android.os.Looper
 import android.util.Log
-import android.util.Size
 import android.view.Surface
 import android.view.SurfaceView
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -29,6 +27,9 @@ import org.tensorflow.lite.examples.poseestimation.ml.TrackerType
 import java.util.*
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import android.widget.Toast
+import android.os.Looper
+import android.util.Size
 
 
 class CameraSource(
@@ -46,7 +47,6 @@ class CameraSource(
         }
 
         // If the outputSizes is null or the desired size isn't supported, return false
-        println("*******************************************Camera fomat failed!")
         return false
     }
 
@@ -165,20 +165,17 @@ class CameraSource(
         }
 
     fun prepareCamera() {
-        // 어떤 카메라를 쓸지 결정
         for (cameraId in cameraManager.cameraIdList) {
             val characteristics = cameraManager.getCameraCharacteristics(cameraId)
-            val deviceLevel = characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)
-            if (deviceLevel == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL){ // camera api를 다 지원하는 카메라로 설정
-                this.cameraId = cameraId
-            }
+
             // We don't use a front facing camera in this sample.
-//            val cameraDirection = characteristics.get(CameraCharacteristics.LENS_FACING)
-//            if (cameraDirection != null &&
-//                cameraDirection == CameraCharacteristics.LENS_FACING_FRONT
-//            ) {
-//                continue
-//            }
+            val cameraDirection = characteristics.get(CameraCharacteristics.LENS_FACING)
+            if (cameraDirection != null &&
+                cameraDirection == CameraCharacteristics.LENS_FACING_FRONT
+            ) {
+                continue
+            }
+            this.cameraId = cameraId
         }
     }
 
@@ -245,7 +242,7 @@ class CameraSource(
         framesPerSecond = 0
     }
 
-    // process image 이미지 분석 코드
+    // process image
     private fun processImage(bitmap: Bitmap) {
         val persons = mutableListOf<Person>()
         var classificationResult: List<Pair<String, Float>>? = null
@@ -293,7 +290,7 @@ class CameraSource(
 //                        showToast("Excellent")
                         if (isCenterXInMiddleGrid && isCenterYInMiddleGrid) {
                             // The object is in the center grid, show 'Good' toast
-                            showToast("가운데에 있다")
+                            showToast("In Center")
                         } else {
                             // The object is out of the center grid, show the distance to the center grid
                             val distanceToCenterGridX = when {
@@ -304,7 +301,7 @@ class CameraSource(
                                 center.y <= heightThird -> heightThird - center.y
                                 else -> center.y - 2 * heightThird
                             }
-                            showToast("Out of center grid by \n dx=$distanceToCenterGridX, dy=$distanceToCenterGridY")
+                            showToast("Out of center grid by dx=$distanceToCenterGridX, dy=$distanceToCenterGridY")
                         }
                     }
                 }
@@ -319,21 +316,11 @@ class CameraSource(
     }
     // In CameraSource class
     // In CameraSource class
-
-//    showToast 메소드가 메인 스레드에서 호출되면 즉시 onDistanceUpdate 메소드를 호출하고,
-//    그렇지 않으면 Handler를 사용하여 메인 스레드에서 실행되도록 예약합니다. 이렇게 하면 딜레이를 최소화할 수 있습니다.
     private fun showToast(message: String) {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            listener?.onDistanceUpdate(message)
-        } else {
-            Handler(Looper.getMainLooper()).post {
-                listener?.onDistanceUpdate(message)
-            }
+        Handler(Looper.getMainLooper()).post {
+            Toast.makeText(surfaceView.context, message, Toast.LENGTH_SHORT).show()
         }
     }
-
-
-
 
 
     private fun visualize(persons: List<Person>, bitmap: Bitmap) {
@@ -390,7 +377,5 @@ class CameraSource(
         fun onFPSListener(fps: Int)
 
         fun onDetectedInfo(personScore: Float?, poseLabels: List<Pair<String, Float>>?)
-
-        fun onDistanceUpdate(message: String)
     }
 }

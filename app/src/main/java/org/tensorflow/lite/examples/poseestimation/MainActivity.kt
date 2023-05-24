@@ -34,7 +34,7 @@ import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.tensorflow.lite.examples.poseestimation.camera.CameraSource // 카메라 관련 라이브러리
+import org.tensorflow.lite.examples.poseestimation.camera.CameraSource
 import org.tensorflow.lite.examples.poseestimation.data.Device
 import org.tensorflow.lite.examples.poseestimation.ml.*
 import android.widget.Toast
@@ -134,7 +134,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        println("**************************** onCreate()")
         setContentView(R.layout.activity_main)
         // keep screen on while app is running
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -153,19 +152,17 @@ class MainActivity : AppCompatActivity() {
         initSpinner()
         spnModel.setSelection(modelPos)
         swClassification.setOnCheckedChangeListener(setClassificationListener)
-        if (!isCameraPermissionGranted()) { // 카메라 권한이 없다면
-            requestPermission() // 권한 요청
+        if (!isCameraPermissionGranted()) {
+            requestPermission()
         }
     }
 
-    override fun onStart() { // 1단계
+    override fun onStart() {
         super.onStart()
-        println("************************************ onStart()")
-        openCamera() // 카메라 시작
+        openCamera()
     }
 
-    override fun onResume() { // 2단계
-        println("************************************ onResume()")
+    override fun onResume() {
         cameraSource?.resume()
         super.onResume()
     }
@@ -177,7 +174,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // check if permission is granted or not.
-    private fun isCameraPermissionGranted(): Boolean { // 권한 요청 코드
+    private fun isCameraPermissionGranted(): Boolean {
         return checkPermission(
             Manifest.permission.CAMERA,
             Process.myPid(),
@@ -186,18 +183,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     // open camera
-    private fun openCamera() { // 카메라 시작 코드
-        if (isCameraPermissionGranted()) { // 권한 요청
+    private fun openCamera() {
+        if (isCameraPermissionGranted()) {
             if (cameraSource == null) {
                 cameraSource =
                     CameraSource(surfaceView, object : CameraSource.CameraSourceListener {
                         override fun onFPSListener(fps: Int) {
                             tvFPS.text = getString(R.string.tfe_pe_tv_fps, fps)
-                        }
-                        // 거리 텍스트 출력
-                        override fun onDistanceUpdate(message: String) {
-                            val distanceTextView: TextView = findViewById(R.id.distance_text)
-                            distanceTextView.text = message
                         }
 
                         override fun onDetectedInfo(
@@ -226,7 +218,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 isPoseClassifier()
                 lifecycleScope.launch(Dispatchers.Main) {
-                    cameraSource?.initCamera() // 카메라 초기화 함수 시작
+                    cameraSource?.initCamera()
                 }
             }
             createPoseEstimator()
@@ -345,7 +337,7 @@ class MainActivity : AppCompatActivity() {
                 showPoseClassifier(true)
                 showDetectionScore(true)
                 showTracker(false)
-                PoseNet.create(this, device) // 반환값으로 모델 객체
+                PoseNet.create(this, device)
             }
             else -> {
                 null
