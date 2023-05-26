@@ -192,6 +192,11 @@ class MainActivity : AppCompatActivity() {
                             tvFPS.text = getString(R.string.tfe_pe_tv_fps, fps)
                         }
 
+                        override fun onDistanceUpdate(message: String) {
+                            val distanceTextView: TextView = findViewById(R.id.distance_text)
+                            distanceTextView.text = message
+                        }
+
                         override fun onDetectedInfo(
                             personScore: Float?,
                             poseLabels: List<Pair<String, Float>>?

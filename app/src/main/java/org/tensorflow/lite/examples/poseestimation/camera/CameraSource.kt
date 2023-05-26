@@ -27,7 +27,6 @@ import org.tensorflow.lite.examples.poseestimation.ml.TrackerType
 import java.util.*
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import android.widget.Toast
 import android.os.Looper
 import android.util.Size
 
@@ -290,7 +289,6 @@ class CameraSource(
 //                        showToast("Excellent")
                         if (isCenterXInMiddleGrid && isCenterYInMiddleGrid) {
                             // The object is in the center grid, show 'Good' toast
-                            showToast("In Center")
                         } else {
                             // The object is out of the center grid, show the distance to the center grid
                             val distanceToCenterGridX = when {
@@ -301,7 +299,7 @@ class CameraSource(
                                 center.y <= heightThird -> heightThird - center.y
                                 else -> center.y - 2 * heightThird
                             }
-                            showToast("Out of center grid by dx=$distanceToCenterGridX, dy=$distanceToCenterGridY")
+                            showToast("Out of center grid by \n dx=$distanceToCenterGridX, dy=$distanceToCenterGridY")
                         }
                     }
                 }
@@ -316,11 +314,21 @@ class CameraSource(
     }
     // In CameraSource class
     // In CameraSource class
+
+//    showToast 메소드가 메인 스레드에서 호출되면 즉시 onDistanceUpdate 메소드를 호출하고,
+//    그렇지 않으면 Handler를 사용하여 메인 스레드에서 실행되도록 예약합니다. 이렇게 하면 딜레이를 최소화할 수 있습니다.
     private fun showToast(message: String) {
-        Handler(Looper.getMainLooper()).post {
-            Toast.makeText(surfaceView.context, message, Toast.LENGTH_SHORT).show()
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            listener?.onDistanceUpdate(message)
+        } else {
+            Handler(Looper.getMainLooper()).post {
+                listener?.onDistanceUpdate(message)
+            }
         }
     }
+
+
+
 
 
     private fun visualize(persons: List<Person>, bitmap: Bitmap) {
@@ -377,5 +385,7 @@ class CameraSource(
         fun onFPSListener(fps: Int)
 
         fun onDetectedInfo(personScore: Float?, poseLabels: List<Pair<String, Float>>?)
+
+        fun onDistanceUpdate(message: String)
     }
 }
