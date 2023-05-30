@@ -58,7 +58,7 @@ class CameraSource(
         private const val PREVIEW_HEIGHT = 480
 
         /** Threshold for confidence score. */
-        private const val MIN_CONFIDENCE = .2f
+        private const val MIN_CONFIDENCE = 0.3f
         private const val TAG = "Camera Source"
     }
 
@@ -272,29 +272,30 @@ class CameraSource(
             listener?.onDetectedInfo(persons[0].score, classificationResult)
         }
         if (persons.isNotEmpty()) {
+            val person = persons[0]
             if (MainActivity.adjustMode) {
-                val person = persons[0]
-                val (ankle, shoulder) = person.getAnkleAndShoulder()
+                if(person.score > MIN_CONFIDENCE) {
+                    val (ankle, shoulder) = person.getAnkleAndShoulder()
 
-                if (ankle != null) {
-                    val targetAnkleY = bitmap.height.toFloat()-50f
-                    if (ankle.y < targetAnkleY) {
-                        showToast("발목이 하단으로부터 ${targetAnkleY - ankle.y}만큼 위에 있습니다. 아래로 이동해주세요.")
-                    } else {
-                        showToast("발목이 하단으로부터 ${ankle.y - targetAnkleY}만큼 아래에 있습니다. 위로 이동해주세요.")
+                    if (ankle != null) {
+                        val targetAnkleY = bitmap.height.toFloat() - 120f
+                        if (ankle.y < targetAnkleY) {
+                            showToast("발목이 하단으로부터 ${targetAnkleY - ankle.y}만큼 위에 있습니다. 아래로 이동해주세요.")
+                        } else {
+                            showToast("발목이 하단으로부터 ${ankle.y - targetAnkleY}만큼 아래에 있습니다. 위로 이동해주세요.")
+                        }
                     }
                 }
 
-                if (shoulder != null) {
-                    val targetShoulderY = bitmap.height * 1 / 3f
-                    if (shoulder.y < targetShoulderY) {
-                        showToast("어깨가 상단 2/3 지점으로부터 ${targetShoulderY - shoulder.y}만큼 위에 있습니다. 아래로 이동해주세요.")
-                    } else {
-                        showToast("어깨가 상단 2/3 지점으로부터 ${shoulder.y - targetShoulderY}만큼 아래에 있습니다. 위로 이동해주세요.")
-                    }
-                }
+//                if (shoulder != null) {
+//                    val targetShoulderY = bitmap.height * 1 / 3f
+//                    if (shoulder.y < targetShoulderY) {
+//                        showToast("어깨가 상단 2/3 지점으로부터 ${targetShoulderY - shoulder.y}만큼 위에 있습니다. 아래로 이동해주세요.")
+//                    } else {
+//                        showToast("어깨가 상단 2/3 지점으로부터 ${shoulder.y - targetShoulderY}만큼 아래에 있습니다. 위로 이동해주세요.")
+//                    }
+//                }
             } else {
-                val person = persons[0]
                 val center = person.getCenter()
 
                 if (center != null) {
@@ -302,7 +303,9 @@ class CameraSource(
                     val targetY = bitmap.height / 2f
                     val distanceX = targetX - center.x
                     val distanceY = targetY - center.y
-                    showToast("객체가 중앙으로부터 X: ${distanceX}, Y: ${distanceY}만큼 떨어져 있습니다.")
+                    if(person.score > MIN_CONFIDENCE){
+                        showToast("객체가 중앙으로부터 X: ${distanceX}, Y: ${distanceY}만큼 떨어져 있습니다.")
+                    }
                 }
             }
         }
@@ -323,10 +326,6 @@ class CameraSource(
             }
         }
     }
-
-
-
-
 
     private fun visualize(persons: List<Person>, bitmap: Bitmap) {
 

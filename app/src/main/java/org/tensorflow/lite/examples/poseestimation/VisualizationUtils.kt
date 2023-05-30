@@ -16,13 +16,11 @@ limitations under the License.
 
 package org.tensorflow.lite.examples.poseestimation
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
+import android.graphics.*
 import org.tensorflow.lite.examples.poseestimation.data.BodyPart
 import org.tensorflow.lite.examples.poseestimation.data.Person
 import kotlin.math.max
+import org.tensorflow.lite.examples.poseestimation.camera.CameraSource
 
 object VisualizationUtils {
     /** Radius of circle used to draw keypoints.  */
@@ -68,6 +66,11 @@ object VisualizationUtils {
         val paintCircle = Paint().apply {
             strokeWidth = CIRCLE_RADIUS
             color = Color.RED
+            style = Paint.Style.FILL
+        }
+        val paintCircleCenter = Paint().apply {
+            strokeWidth = CIRCLE_RADIUS
+            color = Color.BLUE
             style = Paint.Style.FILL
         }
         val paintLine = Paint().apply {
@@ -127,6 +130,25 @@ object VisualizationUtils {
                     CIRCLE_RADIUS,
                     paintCircle
                 )
+            }
+
+            // 중심부 점 찍기
+            fun drawCenter(): PointF? {
+                val centerPoints = person.keyPoints.filter { it.bodyPart == BodyPart.NOSE || it.bodyPart == BodyPart.LEFT_HIP || it.bodyPart == BodyPart.RIGHT_HIP }
+                // Check if centerPoints is empty before calculating average x, y coordinates
+                if (centerPoints.isEmpty()) {
+                    return null
+                }
+                val avgX = centerPoints.map { it.coordinate.x }.average().toFloat()
+                val avgY = centerPoints.map { it.coordinate.y }.average().toFloat()
+
+                originalSizeCanvas.drawCircle(
+                    avgX,
+                    avgY,
+                    CIRCLE_RADIUS,
+                    paintCircleCenter
+                )
+                return PointF(avgX, avgY)
             }
         }
         return output
