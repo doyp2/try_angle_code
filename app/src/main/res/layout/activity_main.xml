@@ -14,8 +14,7 @@
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        >
+        android:layout_height="?attr/actionBarSize">
 
     </androidx.appcompat.widget.Toolbar>
 
@@ -25,6 +24,9 @@
         android:layout_height="wrap_content"
         android:text="@string/adjust_points" />
 
-
-    <include layout="@layout/bottom_sheet_layout"/>
+    <include layout="@layout/bottom_sheet_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_margin="10dp"/>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

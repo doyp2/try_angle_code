@@ -2,10 +2,7 @@ package org.tensorflow.lite.examples.poseestimation.camera
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.ImageFormat
-import android.graphics.Matrix
-import android.graphics.Rect
+import android.graphics.*
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
@@ -39,21 +36,21 @@ class CameraSource(
     var latestPerson: Person? = null
 
 
-    private fun checkCameraSupport(): Boolean {
+    private fun checkCameraSupport(): Boolean { // 카메라 지원확인 코드
         val characteristics = cameraManager.getCameraCharacteristics(cameraId)
         val map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
 
         // Suppose you need to check support for ImageFormat.YUV_420_888 with a size of 1920x1080
         val outputSizes = map?.getOutputSizes(ImageFormat.YUV_420_888)
         outputSizes?.let { sizes ->
-            return sizes.contains(Size(4032, 3024))
+            return sizes.contains(Size(4032, 3024)) // 해상도 설정
         }
 
         // If the outputSizes is null or the desired size isn't supported, return false
         return false
     }
 
-    companion object {
+    companion object { // 정적 코드
         private const val PREVIEW_WIDTH = 640
         private const val PREVIEW_HEIGHT = 480
 
@@ -101,8 +98,8 @@ class CameraSource(
         camera = openCamera(cameraManager, cameraId)
         imageReader =
             ImageReader.newInstance(PREVIEW_WIDTH, PREVIEW_HEIGHT, ImageFormat.YUV_420_888, 3)
-        imageReader?.setOnImageAvailableListener({ reader ->
-            val image = reader.acquireLatestImage()
+        imageReader?.setOnImageAvailableListener({ reader -> // ImageReader가 새로운 이미지를 사용가능할 때 호출될 리스너 등록
+            val image = reader.acquireLatestImage() // 큐에서 최신 이미지를 가져오고 오래된 이미지 삭제
             if (image != null) {
                 if (!::imageBitmap.isInitialized) {
                     imageBitmap =
@@ -167,18 +164,20 @@ class CameraSource(
             }, imageReaderHandler)
         }
 
-    fun prepareCamera() {
+    fun prepareCamera() { // 어떤 카메라를 쓸지 결정하는 함수
         for (cameraId in cameraManager.cameraIdList) {
             val characteristics = cameraManager.getCameraCharacteristics(cameraId)
-
-            // We don't use a front facing camera in this sample.
-            val cameraDirection = characteristics.get(CameraCharacteristics.LENS_FACING)
-            if (cameraDirection != null &&
-                cameraDirection == CameraCharacteristics.LENS_FACING_FRONT
-            ) {
-                continue
+            val deviceLevel = characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)
+            if (deviceLevel == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL){ // camera api를 다 지원하는 카메라로 설정
+                this.cameraId = cameraId
             }
-            this.cameraId = "0"
+            // We don't use a front facing camera in this sample.
+//            val cameraDirection = characteristics.get(CameraCharacteristics.LENS_FACING)
+//            if (cameraDirection != null &&
+//                cameraDirection == CameraCharacteristics.LENS_FACING_FRONT
+//            ) {
+//                continue
+//            }
         }
     }
 
@@ -246,9 +245,9 @@ class CameraSource(
         framesPerSecond = 0
     }
 
-    // process image
-    // process image
+    // process image 이미지 분석 코드 ******************
     private fun processImage(bitmap: Bitmap) {
+        var check_center : Boolean = false
         val persons = mutableListOf<Person>()
         var classificationResult: List<Pair<String, Float>>? = null
         synchronized(lock) {
@@ -273,7 +272,7 @@ class CameraSource(
         }
         if (persons.isNotEmpty()) {
             val person = persons[0]
-            if (MainActivity.adjustMode) {
+            if (MainActivity.adjustMode) { // 전신확인 단계일 경우 ***************
                 if(person.score > MIN_CONFIDENCE) {
                     val (ankle, shoulder) = person.getAnkleAndShoulder()
 
@@ -286,7 +285,6 @@ class CameraSource(
                         }
                     }
                 }
-
 //                if (shoulder != null) {
 //                    val targetShoulderY = bitmap.height * 1 / 3f
 //                    if (shoulder.y < targetShoulderY) {
@@ -295,26 +293,52 @@ class CameraSource(
 //                        showToast("어깨가 상단 2/3 지점으로부터 ${shoulder.y - targetShoulderY}만큼 아래에 있습니다. 위로 이동해주세요.")
 //                    }
 //                }
-            } else {
+            } else { // 중앙확인 단계일 경우 **************
                 val center = person.getCenter()
-
                 if (center != null) {
-                    val targetX = bitmap.width / 2f
-                    val targetY = bitmap.height / 2f
-                    val distanceX = targetX - center.x
-                    val distanceY = targetY - center.y
+                    val targetX = bitmap.width / 2f // 중앙 x 좌표
+                    val targetY = bitmap.height / 2f // 중앙 y 좌표
+                    val distanceX = targetX - center.x // 중앙 x 좌표 - 사람 x 좌표
+                    val distanceY = targetY - center.y // 중앙 y 좌표 - 사람 y 좌표
                     if(person.score > MIN_CONFIDENCE){
                         showToast("객체가 중앙으로부터 X: ${distanceX}, Y: ${distanceY}만큼 떨어져 있습니다.")
+                    }
+                    // 중앙 확인 코드
+                    val widthThird = bitmap.width / 3f
+                    val heightThird = bitmap.height / 3f
+                    val isCenterXInMiddleGrid = center.x > widthThird && center.x < 2 * widthThird
+                    val isCenterYInMiddleGrid = center.y > heightThird && center.y < 2 * heightThird
+                    val personBoundingBox = person.boundingBox
+                    if (personBoundingBox != null) {
+                        val isPersonInFrame = personBoundingBox.left >= 0 &&
+                                personBoundingBox.top >= 0 &&
+                                personBoundingBox.right <= PREVIEW_WIDTH &&
+                                personBoundingBox.bottom <= PREVIEW_HEIGHT
+                        if (person.isFullBodyDetected() && isPersonInFrame) {
+                            // The person is in the center grid and entire person is within the frame
+                            if (isCenterXInMiddleGrid && isCenterYInMiddleGrid) {
+                                check_center = true
+                                showToast("가운데에 있다")
+                            } else {
+                                // The object is out of the center grid, show the distance to the center grid
+                                val distanceToCenterGridX = when {
+                                    center.x <= widthThird -> widthThird - center.x
+                                    else -> center.x - 2 * widthThird
+                                }
+                                val distanceToCenterGridY = when {
+                                    center.y <= heightThird -> heightThird - center.y
+                                    else -> center.y - 2 * heightThird
+                                }
+//                                showToast("Out of center grid by \n dx=$distanceToCenterGridX, dy=$distanceToCenterGridY")
+                            }
+                        }
                     }
                 }
             }
         }
-
-        visualize(persons, bitmap)
+        visualize(persons, bitmap, check_center)
     }
-
     // In CameraSource class
-
     //    showToast 메소드가 메인 스레드에서 호출되면 즉시 onDistanceUpdate 메소드를 호출하고,
     //    그렇지 않으면 Handler를 사용하여 메인 스레드에서 실행되도록 예약합니다. 이렇게 하면 딜레이를 최소화할 수 있습니다.
     private fun showToast(message: String) {
@@ -327,11 +351,14 @@ class CameraSource(
         }
     }
 
-    private fun visualize(persons: List<Person>, bitmap: Bitmap) {
-
+    private fun visualize(persons: List<Person>, bitmap: Bitmap, check_center: Boolean) {
+        // +check_center 변수 추가해서 중앙이면 다르게 그리게
+        val setC : Int = if (check_center) { Color.GREEN } else { Color.RED }
         val outputBitmap = VisualizationUtils.drawBodyKeypoints(
             bitmap,
-            persons.filter { it.score > MIN_CONFIDENCE }, isTrackerEnabled
+            persons.filter { it.score > MIN_CONFIDENCE },
+            isTrackerEnabled,
+            setC
         )
 
         val holder = surfaceView.holder

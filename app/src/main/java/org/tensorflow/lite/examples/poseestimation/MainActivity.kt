@@ -59,10 +59,10 @@ class MainActivity : AppCompatActivity() {
      * 2 == MoveNet MultiPose model
      * 3 == PoseNet model
      **/
-    private var modelPos = 1
+    private var modelPos = 2 // ********* 기본 모델을 MultiPose 로 설정
 
     /** Default device is CPU */
-    private var device = Device.CPU
+    private var device = Device.CPU // ********** 기본 디바이스를 CPU로 설정
 
     private lateinit var tvScore: TextView
     private lateinit var tvFPS: TextView
@@ -141,17 +141,17 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // *************** 버튼 이벤트 리스너 설정 함수
         val adjustButton: Button = findViewById(R.id.adjustButton)
-
         adjustButton.setOnClickListener {
             showToast("버튼이 클릭되었습니다")
             adjustMode = !adjustMode
-            if (adjustMode) {
-                adjustPoints()
-            }
+//            if (adjustMode) {
+//                adjustPoints()
+//            }
         }
 
-        // screenHeight 값을 설정
+        // *************** screenHeight 값을 설정
         screenHeight = resources.displayMetrics.heightPixels
 
         // keep screen on while app is running
@@ -171,43 +171,42 @@ class MainActivity : AppCompatActivity() {
         initSpinner()
         spnModel.setSelection(modelPos)
         swClassification.setOnCheckedChangeListener(setClassificationListener)
-        if (!isCameraPermissionGranted()) {
-            requestPermission()
+        if (!isCameraPermissionGranted()) { // 카메라 권한이 없다면
+            requestPermission() // 권한 요청
         }
     }
+//    private fun adjustPoints() { // 전신을 확인하는 코드
+//        val newPerson = cameraSource?.latestPerson ?: return
+//
+//        val leftAnkle = newPerson.keyPoints.find { it.bodyPart == BodyPart.fromInt(15) }
+//        val rightAnkle = newPerson.keyPoints.find { it.bodyPart == BodyPart.fromInt(16) }
+//        val leftShoulder = newPerson.keyPoints.find { it.bodyPart == BodyPart.fromInt(5) }
+//        val rightShoulder = newPerson.keyPoints.find { it.bodyPart == BodyPart.fromInt(6) }
+//
+//        // ankle과 shoulder의 현재 위치와 목표 위치 사이의 거리를 계산
+//        val ankleDistance = screenHeight.toFloat() - maxOf(leftAnkle?.coordinate?.y ?: 0f, rightAnkle?.coordinate?.y ?: 0f)
+//        val shoulderDistance = (screenHeight * 2 / 3).toFloat() - minOf(leftShoulder?.coordinate?.y ?: 0f, rightShoulder?.coordinate?.y ?: 0f)
+//
+//        // ankle과 shoulder가 목표 위치에 도달하도록 유도하는 메시지를 출력
+//        if (ankleDistance > 0) {
+//            showToast("Ankle이 아래로 ${ankleDistance}만큼 이동해야 합니다.")
+//        } else {
+//            showToast("Ankle이 위로 ${-ankleDistance}만큼 이동해야 합니다.")
+//        }
+//
+//        if (shoulderDistance > 0) {
+//            showToast("Shoulder이 아래로 ${shoulderDistance}만큼 이동해야 합니다.")
+//        } else {
+//            showToast("Shoulder이 위로 ${-shoulderDistance}만큼 이동해야 합니다.")
+//        }
+//    }
 
-    private fun adjustPoints() {
-        val newPerson = cameraSource?.latestPerson ?: return
-
-        val leftAnkle = newPerson.keyPoints.find { it.bodyPart == BodyPart.fromInt(15) }
-        val rightAnkle = newPerson.keyPoints.find { it.bodyPart == BodyPart.fromInt(16) }
-        val leftShoulder = newPerson.keyPoints.find { it.bodyPart == BodyPart.fromInt(5) }
-        val rightShoulder = newPerson.keyPoints.find { it.bodyPart == BodyPart.fromInt(6) }
-
-        // ankle과 shoulder의 현재 위치와 목표 위치 사이의 거리를 계산
-        val ankleDistance = screenHeight.toFloat() - maxOf(leftAnkle?.coordinate?.y ?: 0f, rightAnkle?.coordinate?.y ?: 0f)
-        val shoulderDistance = (screenHeight * 2 / 3).toFloat() - minOf(leftShoulder?.coordinate?.y ?: 0f, rightShoulder?.coordinate?.y ?: 0f)
-
-        // ankle과 shoulder가 목표 위치에 도달하도록 유도하는 메시지를 출력
-        if (ankleDistance > 0) {
-            showToast("Ankle이 아래로 ${ankleDistance}만큼 이동해야 합니다.")
-        } else {
-            showToast("Ankle이 위로 ${-ankleDistance}만큼 이동해야 합니다.")
-        }
-
-        if (shoulderDistance > 0) {
-            showToast("Shoulder이 아래로 ${shoulderDistance}만큼 이동해야 합니다.")
-        } else {
-            showToast("Shoulder이 위로 ${-shoulderDistance}만큼 이동해야 합니다.")
-        }
-    }
-
-    override fun onStart() {
+    override fun onStart() { // 1단계
         super.onStart()
-        openCamera()
+        openCamera() // 카메라 시작
     }
 
-    override fun onResume() {
+    override fun onResume() { // 2단계
         cameraSource?.resume()
         super.onResume()
     }
@@ -219,7 +218,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // check if permission is granted or not.
-    private fun isCameraPermissionGranted(): Boolean {
+    private fun isCameraPermissionGranted(): Boolean { // 권한 요청 코드
         return checkPermission(
             Manifest.permission.CAMERA,
             Process.myPid(),
@@ -228,15 +227,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     // open camera
-    private fun openCamera() {
-        if (isCameraPermissionGranted()) {
+    private fun openCamera() { // 카메라 시작 코드
+        if (isCameraPermissionGranted()) { // 권한 요청
             if (cameraSource == null) {
                 cameraSource =
                     CameraSource(surfaceView, object : CameraSource.CameraSourceListener {
                         override fun onFPSListener(fps: Int) {
                             tvFPS.text = getString(R.string.tfe_pe_tv_fps, fps)
                         }
-
+                        // 거리 텍스트 출력
                         override fun onDistanceUpdate(message: String) {
                             val distanceTextView: TextView = findViewById(R.id.distance_text)
                             distanceTextView.text = message
@@ -264,11 +263,11 @@ class MainActivity : AppCompatActivity() {
                         }
 
                     }).apply {
-                        prepareCamera()
+                        prepareCamera() // 카메라 준비 함수
                     }
                 isPoseClassifier()
                 lifecycleScope.launch(Dispatchers.Main) {
-                    cameraSource?.initCamera()
+                    cameraSource?.initCamera() // 카메라 시작 함수 (코루틴)
                 }
             }
             createPoseEstimator()
@@ -352,7 +351,7 @@ class MainActivity : AppCompatActivity() {
     private fun createPoseEstimator() {
         // For MoveNet MultiPose, hide score and disable pose classifier as the model returns
         // multiple Person instances.
-        val poseDetector = when (modelPos) {
+        val poseDetector = when (modelPos) { // 반환값으로 모델 객체
             0 -> {
                 // MoveNet Lightning (SinglePose)
                 showPoseClassifier(true)
@@ -471,10 +470,8 @@ class MainActivity : AppCompatActivity() {
                 .create()
 
         companion object {
-
             @JvmStatic
             private val ARG_MESSAGE = "message"
-
             @JvmStatic
             fun newInstance(message: String): ErrorDialog = ErrorDialog().apply {
                 arguments = Bundle().apply { putString(ARG_MESSAGE, message) }

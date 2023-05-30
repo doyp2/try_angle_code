@@ -61,21 +61,22 @@ object VisualizationUtils {
     fun drawBodyKeypoints(
         input: Bitmap,
         persons: List<Person>,
-        isTrackerEnabled: Boolean = false
+        isTrackerEnabled: Boolean = false,
+        setColor: Int
     ): Bitmap {
-        val paintCircle = Paint().apply {
+        val paintCircle = Paint().apply { // 관절 원
             strokeWidth = CIRCLE_RADIUS
-            color = Color.RED
+            color = setColor
             style = Paint.Style.FILL
         }
-        val paintCircleCenter = Paint().apply {
+        val paintCircleCenter = Paint().apply { // 중앙 점
             strokeWidth = CIRCLE_RADIUS
             color = Color.BLUE
             style = Paint.Style.FILL
         }
-        val paintLine = Paint().apply {
+        val paintLine = Paint().apply { // 관절 라인
             strokeWidth = LINE_WIDTH
-            color = Color.RED
+            color = setColor
             style = Paint.Style.STROKE
         }
 
@@ -96,6 +97,7 @@ object VisualizationUtils {
 
         val widthThird = input.width / 3f
         val heightThird = input.height / 3f
+
         for (i in 1..2) {
             originalSizeCanvas.drawLine(i * widthThird, 0f, i * widthThird, input.height.toFloat(), gridPaint)
             originalSizeCanvas.drawLine(0f, i * heightThird, input.width.toFloat(), i * heightThird, gridPaint)
