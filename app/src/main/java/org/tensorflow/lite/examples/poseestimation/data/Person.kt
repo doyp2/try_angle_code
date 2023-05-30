@@ -63,6 +63,29 @@ data class Person(
         return false
     }
 
+    fun getAnkleAndShoulder(): Pair<PointF?, PointF?> {
+        val leftAnkle = keyPoints.find { it.bodyPart == BodyPart.fromInt(15) }
+        val rightAnkle = keyPoints.find { it.bodyPart == BodyPart.fromInt(16) }
+        val leftShoulder = keyPoints.find { it.bodyPart == BodyPart.fromInt(5) }
+        val rightShoulder = keyPoints.find { it.bodyPart == BodyPart.fromInt(6) }
+
+        val ankle = if (leftAnkle != null && rightAnkle != null) {
+            PointF((leftAnkle.coordinate.x + rightAnkle.coordinate.x) / 2, (leftAnkle.coordinate.y + rightAnkle.coordinate.y) / 2)
+        } else {
+            leftAnkle?.coordinate ?: rightAnkle?.coordinate
+        }
+
+        val shoulder = if (leftShoulder != null && rightShoulder != null) {
+            PointF((leftShoulder.coordinate.x + rightShoulder.coordinate.x) / 2, (leftShoulder.coordinate.y + rightShoulder.coordinate.y) / 2)
+        } else {
+            leftShoulder?.coordinate ?: rightShoulder?.coordinate
+        }
+
+        return Pair(ankle, shoulder)
+    }
+
+
+
 
     private fun distanceBetweenPoints(point1: PointF, point2: PointF): Float {
         return hypot((point2.x - point1.x).toDouble(), (point2.y - point1.y).toDouble()).toFloat()

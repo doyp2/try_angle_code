@@ -29,12 +29,16 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import android.os.Looper
 import android.util.Size
+import org.tensorflow.lite.examples.poseestimation.MainActivity
 
 
 class CameraSource(
     private val surfaceView: SurfaceView,
-    private val listener: CameraSourceListener? = null
+    private val listener: CameraSourceListener? = null,
 ) {
+    var latestPerson: Person? = null
+
+
     private fun checkCameraSupport(): Boolean {
         val characteristics = cameraManager.getCameraCharacteristics(cameraId)
         val map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
@@ -42,7 +46,7 @@ class CameraSource(
         // Suppose you need to check support for ImageFormat.YUV_420_888 with a size of 1920x1080
         val outputSizes = map?.getOutputSizes(ImageFormat.YUV_420_888)
         outputSizes?.let { sizes ->
-            return sizes.contains(Size(1920, 1080))
+            return sizes.contains(Size(4032, 3024))
         }
 
         // If the outputSizes is null or the desired size isn't supported, return false
@@ -174,7 +178,7 @@ class CameraSource(
             ) {
                 continue
             }
-            this.cameraId = cameraId
+            this.cameraId = "0"
         }
     }
 
@@ -224,6 +228,7 @@ class CameraSource(
     }
 
     fun close() {
+
         session?.close()
         session = null
         camera?.close()
@@ -242,14 +247,13 @@ class CameraSource(
     }
 
     // process image
+    // process image
     private fun processImage(bitmap: Bitmap) {
         val persons = mutableListOf<Person>()
         var classificationResult: List<Pair<String, Float>>? = null
-
         synchronized(lock) {
             detector?.estimatePoses(bitmap)?.let {
                 persons.addAll(it)
-
                 // if the model only returns one item, allow running the Pose classifier.
                 if (persons.isNotEmpty()) {
                     classifier?.run {
@@ -263,60 +267,53 @@ class CameraSource(
             // send fps to view
             listener?.onFPSListener(framesPerSecond)
         }
-        // Check the first person's location if persons are detected
-        if (persons.isNotEmpty()) {
-            val person = persons[0]
-            val center = person.getCenter()
-
-            if (center != null) {
-                val widthThird = bitmap.width / 3f
-                val heightThird = bitmap.height / 3f
-
-                val isCenterXInMiddleGrid = center.x > widthThird && center.x < 2 * widthThird
-                val isCenterYInMiddleGrid = center.y > heightThird && center.y < 2 * heightThird
-
-                // Check if the entire person is within the frame
-                val personBoundingBox = person.boundingBox
-                if (personBoundingBox != null) {
-                    val isPersonInFrame = personBoundingBox.left >= 0 &&
-                            personBoundingBox.top >= 0 &&
-                            personBoundingBox.right <= PREVIEW_WIDTH &&
-                            personBoundingBox.bottom <= PREVIEW_HEIGHT
-
-
-                    if (person.isFullBodyDetected() && isPersonInFrame) {
-                        // The person is in the center grid and entire person is within the frame
-//                        showToast("Excellent")
-                        if (isCenterXInMiddleGrid && isCenterYInMiddleGrid) {
-                            // The object is in the center grid, show 'Good' toast
-                        } else {
-                            // The object is out of the center grid, show the distance to the center grid
-                            val distanceToCenterGridX = when {
-                                center.x <= widthThird -> widthThird - center.x
-                                else -> center.x - 2 * widthThird
-                            }
-                            val distanceToCenterGridY = when {
-                                center.y <= heightThird -> heightThird - center.y
-                                else -> center.y - 2 * heightThird
-                            }
-                            showToast("Out of center grid by \n dx=$distanceToCenterGridX, dy=$distanceToCenterGridY")
-                        }
-                    }
-                }
-            }
-        }
-
         // if the model returns only one item, show that item's score.
         if (persons.isNotEmpty()) {
             listener?.onDetectedInfo(persons[0].score, classificationResult)
         }
+        if (persons.isNotEmpty()) {
+            if (MainActivity.adjustMode) {
+                val person = persons[0]
+                val (ankle, shoulder) = person.getAnkleAndShoulder()
+
+                if (ankle != null) {
+                    val targetAnkleY = bitmap.height.toFloat()-50f
+                    if (ankle.y < targetAnkleY) {
+                        showToast("발목이 하단으로부터 ${targetAnkleY - ankle.y}만큼 위에 있습니다. 아래로 이동해주세요.")
+                    } else {
+                        showToast("발목이 하단으로부터 ${ankle.y - targetAnkleY}만큼 아래에 있습니다. 위로 이동해주세요.")
+                    }
+                }
+
+                if (shoulder != null) {
+                    val targetShoulderY = bitmap.height * 1 / 3f
+                    if (shoulder.y < targetShoulderY) {
+                        showToast("어깨가 상단 2/3 지점으로부터 ${targetShoulderY - shoulder.y}만큼 위에 있습니다. 아래로 이동해주세요.")
+                    } else {
+                        showToast("어깨가 상단 2/3 지점으로부터 ${shoulder.y - targetShoulderY}만큼 아래에 있습니다. 위로 이동해주세요.")
+                    }
+                }
+            } else {
+                val person = persons[0]
+                val center = person.getCenter()
+
+                if (center != null) {
+                    val targetX = bitmap.width / 2f
+                    val targetY = bitmap.height / 2f
+                    val distanceX = targetX - center.x
+                    val distanceY = targetY - center.y
+                    showToast("객체가 중앙으로부터 X: ${distanceX}, Y: ${distanceY}만큼 떨어져 있습니다.")
+                }
+            }
+        }
+
         visualize(persons, bitmap)
     }
-    // In CameraSource class
+
     // In CameraSource class
 
-//    showToast 메소드가 메인 스레드에서 호출되면 즉시 onDistanceUpdate 메소드를 호출하고,
-//    그렇지 않으면 Handler를 사용하여 메인 스레드에서 실행되도록 예약합니다. 이렇게 하면 딜레이를 최소화할 수 있습니다.
+    //    showToast 메소드가 메인 스레드에서 호출되면 즉시 onDistanceUpdate 메소드를 호출하고,
+    //    그렇지 않으면 Handler를 사용하여 메인 스레드에서 실행되도록 예약합니다. 이렇게 하면 딜레이를 최소화할 수 있습니다.
     private fun showToast(message: String) {
         if (Looper.myLooper() == Looper.getMainLooper()) {
             listener?.onDistanceUpdate(message)

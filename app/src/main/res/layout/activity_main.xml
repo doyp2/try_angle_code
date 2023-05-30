@@ -18,5 +18,12 @@
 
     </androidx.appcompat.widget.Toolbar>
 
+    <Button
+        android:id="@+id/adjustButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/adjust_points" />
+
+
     <include layout="@layout/bottom_sheet_layout"/>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -37,12 +37,17 @@ import kotlinx.coroutines.launch
 import org.tensorflow.lite.examples.poseestimation.camera.CameraSource
 import org.tensorflow.lite.examples.poseestimation.data.Device
 import org.tensorflow.lite.examples.poseestimation.ml.*
+import org.tensorflow.lite.examples.poseestimation.data.BodyPart
 import android.widget.Toast
+import android.widget.Button
+
 
 class MainActivity : AppCompatActivity() {
+    private var screenHeight = 0
 
     companion object {
         private const val FRAGMENT_DIALOG = "dialog"
+        var adjustMode = false
     }
 
     /** A [SurfaceView] for camera preview.   */
@@ -135,6 +140,20 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        val adjustButton: Button = findViewById(R.id.adjustButton)
+
+        adjustButton.setOnClickListener {
+            showToast("버튼이 클릭되었습니다")
+            adjustMode = !adjustMode
+            if (adjustMode) {
+                adjustPoints()
+            }
+        }
+
+        // screenHeight 값을 설정
+        screenHeight = resources.displayMetrics.heightPixels
+
         // keep screen on while app is running
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         tvScore = findViewById(R.id.tvScore)
@@ -154,6 +173,32 @@ class MainActivity : AppCompatActivity() {
         swClassification.setOnCheckedChangeListener(setClassificationListener)
         if (!isCameraPermissionGranted()) {
             requestPermission()
+        }
+    }
+
+    private fun adjustPoints() {
+        val newPerson = cameraSource?.latestPerson ?: return
+
+        val leftAnkle = newPerson.keyPoints.find { it.bodyPart == BodyPart.fromInt(15) }
+        val rightAnkle = newPerson.keyPoints.find { it.bodyPart == BodyPart.fromInt(16) }
+        val leftShoulder = newPerson.keyPoints.find { it.bodyPart == BodyPart.fromInt(5) }
+        val rightShoulder = newPerson.keyPoints.find { it.bodyPart == BodyPart.fromInt(6) }
+
+        // ankle과 shoulder의 현재 위치와 목표 위치 사이의 거리를 계산
+        val ankleDistance = screenHeight.toFloat() - maxOf(leftAnkle?.coordinate?.y ?: 0f, rightAnkle?.coordinate?.y ?: 0f)
+        val shoulderDistance = (screenHeight * 2 / 3).toFloat() - minOf(leftShoulder?.coordinate?.y ?: 0f, rightShoulder?.coordinate?.y ?: 0f)
+
+        // ankle과 shoulder가 목표 위치에 도달하도록 유도하는 메시지를 출력
+        if (ankleDistance > 0) {
+            showToast("Ankle이 아래로 ${ankleDistance}만큼 이동해야 합니다.")
+        } else {
+            showToast("Ankle이 위로 ${-ankleDistance}만큼 이동해야 합니다.")
+        }
+
+        if (shoulderDistance > 0) {
+            showToast("Shoulder이 아래로 ${shoulderDistance}만큼 이동해야 합니다.")
+        } else {
+            showToast("Shoulder이 위로 ${-shoulderDistance}만큼 이동해야 합니다.")
         }
     }
 
