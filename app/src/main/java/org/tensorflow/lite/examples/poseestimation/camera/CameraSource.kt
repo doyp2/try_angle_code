@@ -278,7 +278,7 @@ class CameraSource(
                     val (ankle, shoulder) = person.getAnkleAndShoulder()
 
                     if (ankle != null) {
-                        val targetAnkleY = bitmap.height.toFloat() - 120f
+                        val targetAnkleY = bitmap.height.toFloat() - 60f
                         if (ankle.y < targetAnkleY) {
                             showToast("발목이 하단으로부터 ${targetAnkleY - ankle.y}만큼 위에 있습니다. 아래로 이동해주세요.")
                         } else {

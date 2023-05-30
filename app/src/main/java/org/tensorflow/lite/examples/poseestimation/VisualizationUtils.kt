@@ -150,6 +150,7 @@ object VisualizationUtils {
                 )
                 return PointF(avgX, avgY)
             }
+            drawCenter()
         }
         return output
     }
