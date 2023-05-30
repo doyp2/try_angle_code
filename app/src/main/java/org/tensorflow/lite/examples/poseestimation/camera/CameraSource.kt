@@ -43,7 +43,7 @@ class CameraSource(
         // Suppose you need to check support for ImageFormat.YUV_420_888 with a size of 1920x1080
         val outputSizes = map?.getOutputSizes(ImageFormat.YUV_420_888)
         outputSizes?.let { sizes ->
-            return sizes.contains(Size(4032, 3024)) // 해상도 설정
+            return sizes.contains(Size(1920, 1080)) // 해상도 설정
         }
 
         // If the outputSizes is null or the desired size isn't supported, return false
@@ -53,6 +53,8 @@ class CameraSource(
     companion object { // 정적 코드
         private const val PREVIEW_WIDTH = 640
         private const val PREVIEW_HEIGHT = 480
+        private const val PREVIEW_WIDTH_T = 480
+        private const val PREVIEW_HEIGHT_T = 640
 
         /** Threshold for confidence score. */
         private const val MIN_CONFIDENCE = 0.3f
@@ -97,7 +99,7 @@ class CameraSource(
         checkCameraSupport()
         camera = openCamera(cameraManager, cameraId)
         imageReader =
-            ImageReader.newInstance(PREVIEW_WIDTH, PREVIEW_HEIGHT, ImageFormat.YUV_420_888, 3)
+            ImageReader.newInstance(PREVIEW_WIDTH_T, PREVIEW_HEIGHT_T, ImageFormat.YUV_420_888, 3)
         imageReader?.setOnImageAvailableListener({ reader -> // ImageReader가 새로운 이미지를 사용가능할 때 호출될 리스너 등록
             val image = reader.acquireLatestImage() // 큐에서 최신 이미지를 가져오고 오래된 이미지 삭제
             if (image != null) {
@@ -310,10 +312,8 @@ class CameraSource(
                     val isCenterYInMiddleGrid = center.y > heightThird && center.y < 2 * heightThird
                     val personBoundingBox = person.boundingBox
                     if (personBoundingBox != null) {
-                        val isPersonInFrame = personBoundingBox.left >= 0 &&
-                                personBoundingBox.top >= 0 &&
-                                personBoundingBox.right <= PREVIEW_WIDTH &&
-                                personBoundingBox.bottom <= PREVIEW_HEIGHT
+                        val isPersonInFrame = personBoundingBox.left >= 0 && personBoundingBox.top >= 0 &&
+                                personBoundingBox.right <= PREVIEW_WIDTH_T && personBoundingBox.bottom <= PREVIEW_HEIGHT_T
                         if (person.isFullBodyDetected() && isPersonInFrame) {
                             // The person is in the center grid and entire person is within the frame
                             if (isCenterXInMiddleGrid && isCenterYInMiddleGrid) {
