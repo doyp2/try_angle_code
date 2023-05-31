@@ -103,8 +103,12 @@ object VisualizationUtils {
             originalSizeCanvas.drawLine(i * widthThird, 0f, i * widthThird, input.height.toFloat(), gridPaint)
             originalSizeCanvas.drawLine(0f, i * heightThird, input.width.toFloat(), i * heightThird, gridPaint)
         }
-
-        persons.forEach { person ->
+        // 사람 한명만 감지
+        var personsT = mutableListOf<Person>()
+        if(persons.isNotEmpty()){
+            personsT.add(persons[0])
+        }
+        personsT.forEach { person ->
             // draw person id if tracker is enable
             if (isTrackerEnabled) {
                 person.boundingBox?.let {
