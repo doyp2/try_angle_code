@@ -173,13 +173,6 @@ class CameraSource(
             if (deviceLevel == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL){ // camera api를 다 지원하는 카메라로 설정
                 this.cameraId = cameraId
             }
-            // We don't use a front facing camera in this sample.
-//            val cameraDirection = characteristics.get(CameraCharacteristics.LENS_FACING)
-//            if (cameraDirection != null &&
-//                cameraDirection == CameraCharacteristics.LENS_FACING_FRONT
-//            ) {
-//                continue
-//            }
         }
     }
 
@@ -249,6 +242,7 @@ class CameraSource(
 
     // process image 이미지 분석 코드 ******************
     private fun processImage(bitmap: Bitmap) {
+        var setDir = 0
         var check_center : Boolean = false
         val persons = mutableListOf<Person>()
         var classificationResult: List<Pair<String, Float>>? = null
@@ -302,14 +296,15 @@ class CameraSource(
                     val targetY = bitmap.height / 2f // 중앙 y 좌표
                     val distanceX = targetX - center.x // 중앙 x 좌표 - 사람 x 좌표
                     val distanceY = targetY - center.y // 중앙 y 좌표 - 사람 y 좌표
-                    if(person.score > MIN_CONFIDENCE){
-                        showToast("객체가 중앙으로부터 X: ${distanceX}, Y: ${distanceY}만큼 떨어져 있습니다.")
-                    }
+
+//                    if(person.score > MIN_CONFIDENCE){
+//                        showToast("객체가 중앙으로부터 X: ${distanceX}, Y: ${distanceY}만큼 떨어져 있습니다.")
+//                    }
                     // 중앙 확인 코드
-                    val widthThird = bitmap.width / 3f
-                    val heightThird = bitmap.height / 3f
-                    val isCenterXInMiddleGrid = center.x > widthThird && center.x < 2 * widthThird
-                    val isCenterYInMiddleGrid = center.y > heightThird && center.y < 2 * heightThird
+                    val widthThird = bitmap.width / 3f // 480/3 = 120
+                    val heightThird = bitmap.height / 3f // 640/3 = 213.33
+                    val isCenterXInMiddleGrid = center.x > widthThird + 40f && center.x < (2*widthThird) - 40f
+                    val isCenterYInMiddleGrid = center.y > heightThird + 80f && center.y < (2*heightThird) - 80f
                     val personBoundingBox = person.boundingBox
                     if (personBoundingBox != null) {
                         val isPersonInFrame = personBoundingBox.left >= 0 && personBoundingBox.top >= 0 &&
@@ -319,7 +314,7 @@ class CameraSource(
                             if (isCenterXInMiddleGrid && isCenterYInMiddleGrid) {
                                 check_center = true
                                 showToast("가운데에 있다")
-                            } else {
+                            } else { // 가운데에 있지않다면
                                 // The object is out of the center grid, show the distance to the center grid
                                 val distanceToCenterGridX = when {
                                     center.x <= widthThird -> widthThird - center.x
@@ -329,6 +324,21 @@ class CameraSource(
                                     center.y <= heightThird -> heightThird - center.y
                                     else -> center.y - 2 * heightThird
                                 }
+                                setDir = if (center.x < targetX - 10f){
+                                    -1
+                                } else if (center.x > targetX + 10f){
+                                    1
+                                } else{
+                                    if (center.y < targetY - 10f){
+                                        -2
+                                    }
+                                    else if (center.y > targetY + 10f){
+                                        2
+                                    }
+                                    else{
+                                        0
+                                    }
+                                }
 //                                showToast("Out of center grid by \n dx=$distanceToCenterGridX, dy=$distanceToCenterGridY")
                             }
                         }
@@ -336,7 +346,7 @@ class CameraSource(
                 }
             }
         }
-        visualize(persons, bitmap, check_center)
+        visualize(persons, bitmap, check_center, setDir)
     }
     // In CameraSource class
     //    showToast 메소드가 메인 스레드에서 호출되면 즉시 onDistanceUpdate 메소드를 호출하고,
@@ -351,14 +361,15 @@ class CameraSource(
         }
     }
 
-    private fun visualize(persons: List<Person>, bitmap: Bitmap, check_center: Boolean) {
+    private fun visualize(persons: List<Person>, bitmap: Bitmap, check_center: Boolean, setDir: Int) {
         // +check_center 변수 추가해서 중앙이면 다르게 그리게
         val setC : Int = if (check_center) { Color.GREEN } else { Color.RED }
         val outputBitmap = VisualizationUtils.drawBodyKeypoints(
             bitmap,
             persons.filter { it.score > MIN_CONFIDENCE },
             isTrackerEnabled,
-            setC
+            setC,
+            setDir
         )
 
         val holder = surfaceView.holder

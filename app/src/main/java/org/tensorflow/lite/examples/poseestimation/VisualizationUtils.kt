@@ -62,7 +62,8 @@ object VisualizationUtils {
         input: Bitmap,
         persons: List<Person>,
         isTrackerEnabled: Boolean = false,
-        setColor: Int
+        setColor: Int,
+        dir: Int
     ): Bitmap {
         val paintCircle = Paint().apply { // 관절 원
             strokeWidth = CIRCLE_RADIUS
@@ -153,6 +154,34 @@ object VisualizationUtils {
                 return PointF(avgX, avgY)
             }
             drawCenter()
+
+            val paintArrow = Paint().apply {
+                strokeWidth = LINE_WIDTH
+                color = Color.RED
+                style = Paint.Style.STROKE
+            }
+
+            if(dir == 1){
+                originalSizeCanvas.drawLine(40f,320f,120f,320f,paintArrow)
+                originalSizeCanvas.drawLine(40f,320f,60f,340f,paintArrow)
+                originalSizeCanvas.drawLine(40f,320f,60f,300f,paintArrow)
+            }
+            if(dir == -1){
+                originalSizeCanvas.drawLine(360f,320f,440f,320f,paintArrow)
+                originalSizeCanvas.drawLine(420f,340f,440f,320f,paintArrow)
+                originalSizeCanvas.drawLine(420f,300f,440f,320f,paintArrow)
+            }
+            if (dir == 2){
+                originalSizeCanvas.drawLine(240f,20f,240f,60f,paintArrow)
+                originalSizeCanvas.drawLine(230f,30f,240f,20f,paintArrow)
+                originalSizeCanvas.drawLine(250f,30f,240f,20f,paintArrow)
+            }
+            if (dir == -2){
+                originalSizeCanvas.drawLine(240f,620f,240f,580f,paintArrow)
+                originalSizeCanvas.drawLine(230f,610f,240f,620f,paintArrow)
+                originalSizeCanvas.drawLine(250f,610f,240f,620f,paintArrow)
+
+            }
         }
         return output
     }

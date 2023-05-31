@@ -374,6 +374,7 @@ class MainActivity : AppCompatActivity() {
                 if (device == Device.GPU) {
                     showToast(getString(R.string.tfe_pe_gpu_error))
                 }
+                println("*******************************showTracker Start")
                 showTracker(true)
                 MoveNetMultiPose.create(
                     this,
@@ -423,7 +424,7 @@ class MainActivity : AppCompatActivity() {
         if (isVisible) {
             // Show tracker options and enable Bounding Box tracker.
             vTrackerOption.visibility = View.VISIBLE
-            spnTracker.setSelection(1)
+            spnTracker.setSelection(1) // 기본으로 bindingbox
         } else {
             // Set tracker type to off and hide tracker option.
             vTrackerOption.visibility = View.GONE
