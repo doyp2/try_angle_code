@@ -27,6 +27,8 @@ import kotlin.coroutines.resumeWithException
 import android.os.Looper
 import android.util.Size
 import org.tensorflow.lite.examples.poseestimation.MainActivity
+import java.io.DataOutputStream
+import java.net.Socket
 
 
 class CameraSource(
@@ -35,6 +37,47 @@ class CameraSource(
 ) {
     var latestPerson: Person? = null
 
+    // Socket과 DataOutputStream을 멤버 변수로 추가
+    private var socket: Socket? = null
+    private var dataOutputStream: DataOutputStream? = null
+
+    // 라즈베리 파이로 데이터 전송
+    private fun sendToRaspberryPi(message: String) {
+        Thread {
+            try {
+                // 소켓과 DataOutputStream이 이미 열려 있는지 확인
+                if (socket == null || socket!!.isClosed) {
+                    socket = Socket("192.168.1.198", 5555)
+                    dataOutputStream = DataOutputStream(socket!!.getOutputStream())
+                }
+                // 메시지를 전송하고 줄 바꿈 문자를 추가하여 메시지의 끝을 표시
+                dataOutputStream?.writeBytes("$message\n")
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }.start()
+    }
+    // 앱이 시작될 때 Socket과 DataOutputStream을 초기화
+    private fun start() {
+        Thread {
+            try {
+                socket = Socket("192.168.1.198", 5555)
+                dataOutputStream = DataOutputStream(socket!!.getOutputStream())
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }.start()
+    }
+
+    // 앱이 종료될 때 Socket과 DataOutputStream을 닫음
+    fun stop() {
+        try {
+            dataOutputStream?.close()
+            socket?.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 
     private fun checkCameraSupport(): Boolean { // 카메라 지원확인 코드
         val characteristics = cameraManager.getCameraCharacteristics(cameraId)
@@ -266,6 +309,7 @@ class CameraSource(
         if (persons.isNotEmpty()) {
             listener?.onDetectedInfo(persons[0].score, classificationResult)
         }
+        // 사람 객체가 있으면 실행
         if (persons.isNotEmpty()) {
             val person = persons[0]
             if (MainActivity.adjustMode) { // 전신확인 단계일 경우 ***************
