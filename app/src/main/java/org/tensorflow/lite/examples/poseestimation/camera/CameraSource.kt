@@ -73,8 +73,9 @@ class CameraSource(
             try {
                 // 소켓과 DataOutputStream이 이미 열려 있는지 확인
                 if (socket_motor == null || socket_motor!!.isClosed) {
-                    socket_motor = Socket("192.168.35.151", 5555)
-                    dataOutputStream_motor = DataOutputStream(socket_motor!!.getOutputStream())
+                    return@Thread
+//                    socket_motor = Socket("192.168.35.151", 5555)
+//                    dataOutputStream_motor = DataOutputStream(socket_motor!!.getOutputStream())
                 }
                 // 메시지를 전송하고 줄 바꿈 문자를 추가하여 메시지의 끝을 표시
                 dataOutputStream_motor?.write(message.toByteArray())
@@ -90,9 +91,10 @@ class CameraSource(
             try {
                 // 소켓과 DataOutputStream이 이미 열려 있는지 확인
                 if (socket == null || socket!!.isClosed) {
-                    socket = Socket("192.168.35.151", 9000)
-                    dataOutputStream = DataOutputStream(socket!!.getOutputStream())
-                    dataInputStream = DataInputStream(socket!!.getInputStream())
+                    return@Thread
+//                    socket = Socket("192.168.35.151", 9000)
+//                    dataOutputStream = DataOutputStream(socket!!.getOutputStream())
+//                    dataInputStream = DataInputStream(socket!!.getInputStream())
                 }
 
                 dataInputStream?.readByte() // start 수신
@@ -136,14 +138,14 @@ class CameraSource(
     private fun stop() {
         Thread {
             try {
-                dataOutputStream?.write("end".toByteArray())
                 dataOutputStream?.close()
                 dataInputStream?.close()
                 socket?.close()
 
-                dataOutputStream_motor?.write("end".toByteArray())
                 dataOutputStream_motor?.close()
                 socket_motor?.close()
+
+                stoph()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -216,10 +218,10 @@ class CameraSource(
     private var cameraId: String = ""
 
     suspend fun initCamera() {
-        start() // 통신 시작
-        start_motor()
+        start() // 웹서버와 통신 시작
+        start_motor() // 모터와 통신 시작
         checkCameraSupport()
-        starth()
+        starth() // 모터 확인(수시)
         camera = openCamera(cameraManager, cameraId)
         imageReader = ImageReader.newInstance(PREVIEW_WIDTH_T, PREVIEW_HEIGHT_T, ImageFormat.YUV_420_888, 3)
         imageReader?.setOnImageAvailableListener({ reader -> // ImageReader가 새로운 이미지를 사용가능할 때 호출될 리스너 등록
