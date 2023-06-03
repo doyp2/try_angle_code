@@ -7,13 +7,17 @@ import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
+import android.media.Image
 import android.media.ImageReader
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.Looper
 import android.util.Log
+import android.util.Size
 import android.view.Surface
 import android.view.SurfaceView
 import kotlinx.coroutines.suspendCancellableCoroutine
+import org.tensorflow.lite.examples.poseestimation.MainActivity
 import org.tensorflow.lite.examples.poseestimation.VisualizationUtils
 import org.tensorflow.lite.examples.poseestimation.YuvToRgbConverter
 import org.tensorflow.lite.examples.poseestimation.data.Person
@@ -21,14 +25,13 @@ import org.tensorflow.lite.examples.poseestimation.ml.MoveNetMultiPose
 import org.tensorflow.lite.examples.poseestimation.ml.PoseClassifier
 import org.tensorflow.lite.examples.poseestimation.ml.PoseDetector
 import org.tensorflow.lite.examples.poseestimation.ml.TrackerType
+import java.io.ByteArrayOutputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
+import java.net.Socket
 import java.util.*
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import android.os.Looper
-import android.util.Size
-import org.tensorflow.lite.examples.poseestimation.MainActivity
-import java.io.DataOutputStream
-import java.net.Socket
 
 
 class CameraSource(
@@ -40,6 +43,8 @@ class CameraSource(
     // Socket과 DataOutputStream을 멤버 변수로 추가
     private var socket: Socket? = null
     private var dataOutputStream: DataOutputStream? = null
+    private var dataInputStream: DataInputStream? = null
+    private var buffer = 30000
 
     // 라즈베리 파이로 데이터 전송
     private fun sendToRaspberryPi(message: String) {
@@ -47,22 +52,47 @@ class CameraSource(
             try {
                 // 소켓과 DataOutputStream이 이미 열려 있는지 확인
                 if (socket == null || socket!!.isClosed) {
-                    socket = Socket("192.168.1.198", 5555)
+                    socket = Socket("192.168.35.151", 9000)
                     dataOutputStream = DataOutputStream(socket!!.getOutputStream())
                 }
                 // 메시지를 전송하고 줄 바꿈 문자를 추가하여 메시지의 끝을 표시
-                dataOutputStream?.writeBytes("$message\n")
+                dataOutputStream?.writeBytes("$message")
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }.start()
     }
+
+    private fun sendToImg(img : ByteArray) {
+        Thread {
+            try {
+                // 소켓과 DataOutputStream이 이미 열려 있는지 확인
+                if (socket == null || socket!!.isClosed) {
+                    socket = Socket("192.168.35.151", 9000)
+                    dataOutputStream = DataOutputStream(socket!!.getOutputStream())
+                    dataInputStream = DataInputStream(socket!!.getInputStream())
+                }
+                dataInputStream?.readByte() // start 수신
+                val imageSizeBytes = img.size.toString().toByteArray()
+                dataOutputStream?.write(imageSizeBytes)
+                dataOutputStream?.flush()
+
+                dataInputStream?.readByte() // image 수신
+                dataOutputStream?.write(img)
+                dataOutputStream?.flush()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }.start()
+    }
+
     // 앱이 시작될 때 Socket과 DataOutputStream을 초기화
     private fun start() {
         Thread {
             try {
-                socket = Socket("192.168.1.198", 5555)
+                socket = Socket("192.168.35.151", 9000)
                 dataOutputStream = DataOutputStream(socket!!.getOutputStream())
+                dataInputStream = DataInputStream(socket!!.getInputStream())
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -70,13 +100,22 @@ class CameraSource(
     }
 
     // 앱이 종료될 때 Socket과 DataOutputStream을 닫음
-    fun stop() {
-        try {
-            dataOutputStream?.close()
-            socket?.close()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+    private fun stop() {
+        Thread {
+            try {
+                dataOutputStream?.writeBytes("end")
+                dataOutputStream?.close()
+                socket?.close()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }.start()
+    }
+    // 카메라 이미지를 바이트로 변환하는 함수
+    private fun convertImageToJpeg(bitmap: Bitmap): ByteArray {
+        val outputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
+        return outputStream.toByteArray()
     }
 
     private fun checkCameraSupport(): Boolean { // 카메라 지원확인 코드
@@ -139,10 +178,10 @@ class CameraSource(
     private var cameraId: String = ""
 
     suspend fun initCamera() {
+        start() // 통신 시작
         checkCameraSupport()
         camera = openCamera(cameraManager, cameraId)
-        imageReader =
-            ImageReader.newInstance(PREVIEW_WIDTH_T, PREVIEW_HEIGHT_T, ImageFormat.YUV_420_888, 3)
+        imageReader = ImageReader.newInstance(PREVIEW_WIDTH_T, PREVIEW_HEIGHT_T, ImageFormat.YUV_420_888, 3)
         imageReader?.setOnImageAvailableListener({ reader -> // ImageReader가 새로운 이미지를 사용가능할 때 호출될 리스너 등록
             val image = reader.acquireLatestImage() // 큐에서 최신 이미지를 가져오고 오래된 이미지 삭제
             if (image != null) {
@@ -156,6 +195,8 @@ class CameraSource(
                 }
                 yuvConverter.yuvToRgb(image, imageBitmap)
                 // Create rotated version for portrait display
+                val jpegBytes = convertImageToJpeg(imageBitmap)
+                sendToImg(jpegBytes)
                 val rotateMatrix = Matrix()
                 rotateMatrix.postRotate(90.0f)
 
@@ -265,7 +306,7 @@ class CameraSource(
     }
 
     fun close() {
-
+        stop()
         session?.close()
         session = null
         camera?.close()
