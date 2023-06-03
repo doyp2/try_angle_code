@@ -16,6 +16,7 @@ import android.util.Log
 import android.util.Size
 import android.view.Surface
 import android.view.SurfaceView
+import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.tensorflow.lite.examples.poseestimation.MainActivity
 import org.tensorflow.lite.examples.poseestimation.VisualizationUtils
@@ -42,21 +43,42 @@ class CameraSource(
 
     // Socket과 DataOutputStream을 멤버 변수로 추가
     private var socket: Socket? = null
+    private var socket_motor: Socket? = null
     private var dataOutputStream: DataOutputStream? = null
     private var dataInputStream: DataInputStream? = null
-    private var buffer = 30000
+    private var dataOutputStream_motor: DataOutputStream? = null
+
+    private var h = Handler()
+    private var check_person:Boolean = false
+
+    private var testd = object : Runnable {
+        override fun run() {
+            if (check_person) {
+                sendToRaspberryPi("@@@")
+            }
+            h.postDelayed(this, 1000L)
+        }
+    }
+
+    private fun starth(){
+        h.post(testd)
+    }
+    private fun stoph(){
+        h.removeCallbacks(testd)
+    }
 
     // 라즈베리 파이로 데이터 전송
     private fun sendToRaspberryPi(message: String) {
         Thread {
             try {
                 // 소켓과 DataOutputStream이 이미 열려 있는지 확인
-                if (socket == null || socket!!.isClosed) {
-                    socket = Socket("192.168.35.151", 9000)
-                    dataOutputStream = DataOutputStream(socket!!.getOutputStream())
+                if (socket_motor == null || socket_motor!!.isClosed) {
+                    socket_motor = Socket("192.168.35.151", 5555)
+                    dataOutputStream_motor = DataOutputStream(socket_motor!!.getOutputStream())
                 }
                 // 메시지를 전송하고 줄 바꿈 문자를 추가하여 메시지의 끝을 표시
-                dataOutputStream?.writeBytes("$message")
+                dataOutputStream_motor?.write(message.toByteArray())
+                dataOutputStream_motor?.flush()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -72,6 +94,7 @@ class CameraSource(
                     dataOutputStream = DataOutputStream(socket!!.getOutputStream())
                     dataInputStream = DataInputStream(socket!!.getInputStream())
                 }
+
                 dataInputStream?.readByte() // start 수신
                 val imageSizeBytes = img.size.toString().toByteArray()
                 dataOutputStream?.write(imageSizeBytes)
@@ -98,20 +121,35 @@ class CameraSource(
             }
         }.start()
     }
-
-    // 앱이 종료될 때 Socket과 DataOutputStream을 닫음
-    private fun stop() {
+    private fun start_motor() {
         Thread {
             try {
-                dataOutputStream?.writeBytes("end")
-                dataOutputStream?.close()
-                socket?.close()
+                socket_motor = Socket("192.168.35.151", 5555)
+                dataOutputStream_motor = DataOutputStream(socket_motor!!.getOutputStream())
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }.start()
     }
-    // 카메라 이미지를 바이트로 변환하는 함수
+
+    // 앱이 종료될 때 Socket과 DataOutputStream을 닫음
+    private fun stop() {
+        Thread {
+            try {
+                dataOutputStream?.write("end".toByteArray())
+                dataOutputStream?.close()
+                dataInputStream?.close()
+                socket?.close()
+
+                dataOutputStream_motor?.write("end".toByteArray())
+                dataOutputStream_motor?.close()
+                socket_motor?.close()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }.start()
+    }
+    // 카메라 이미지를 JPG 바이트로 변환하는 함수
     private fun convertImageToJpeg(bitmap: Bitmap): ByteArray {
         val outputStream = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
@@ -179,7 +217,9 @@ class CameraSource(
 
     suspend fun initCamera() {
         start() // 통신 시작
+        start_motor()
         checkCameraSupport()
+        starth()
         camera = openCamera(cameraManager, cameraId)
         imageReader = ImageReader.newInstance(PREVIEW_WIDTH_T, PREVIEW_HEIGHT_T, ImageFormat.YUV_420_888, 3)
         imageReader?.setOnImageAvailableListener({ reader -> // ImageReader가 새로운 이미지를 사용가능할 때 호출될 리스너 등록
@@ -352,6 +392,7 @@ class CameraSource(
         }
         // 사람 객체가 있으면 실행
         if (persons.isNotEmpty()) {
+            check_person = true
             val person = persons[0]
             if (MainActivity.adjustMode) { // 전신확인 단계일 경우 ***************
                 if(person.score > MIN_CONFIDENCE) {
@@ -430,6 +471,9 @@ class CameraSource(
                     }
                 }
             }
+        }
+        else{
+            check_person = false
         }
         visualize(persons, bitmap, check_center, setDir)
     }
