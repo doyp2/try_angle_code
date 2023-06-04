@@ -51,7 +51,7 @@ class CameraSource(
 
     private var thred_runnig:Boolean = false
     private var check_person:Boolean = false
-    private var jpegBytes:ByteArray? = null
+    private var imgBitmap:Bitmap? = null
 
     var StreamingThread:HandlerThread? = null
     var MotorThread:HandlerThread? = null
@@ -72,19 +72,20 @@ class CameraSource(
         }
     }
 
-    private fun sendToImg(img : ByteArray) {
+    private fun sendToImg(img : Bitmap) {
         try {
             // 소켓과 DataOutputStream이 이미 열려 있는지 확인
             if (socket == null || socket!!.isClosed) {
                 return
             }
+            val imgB = convertImageToJpeg(img)
 
             dataInputStream?.readByte() // start 수신
-            val imageSizeBytes = img.size.toString().toByteArray()
+            val imageSizeBytes = imgB.size.toString().toByteArray()
             dataOutputStream?.write(imageSizeBytes)
 
             dataInputStream?.readByte() // image 수신
-            dataOutputStream?.write(img)
+            dataOutputStream?.write(imgB)
             dataOutputStream?.flush()
         } catch (e: Exception) {
             e.printStackTrace()
@@ -112,26 +113,20 @@ class CameraSource(
 
     // 앱이 종료될 때 Socket과 DataOutputStream을 닫음
     private fun stop() {
-        Thread {
-            try {
-                dataOutputStream?.close()
-                dataInputStream?.close()
-                socket?.close()
-
-                dataOutputStream_motor?.close()
-                socket_motor?.close()
-
-//                motor_handler_stop()
-//                stream_handler_stop()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }.start()
+        try {
+            dataOutputStream?.close()
+            dataInputStream?.close()
+            socket?.close()
+            dataOutputStream_motor?.close()
+            socket_motor?.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
     // 카메라 이미지를 JPG 바이트로 변환하는 함수
     private fun convertImageToJpeg(bitmap: Bitmap): ByteArray {
         val outputStream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 10, outputStream)
         return outputStream.toByteArray()
     }
 
@@ -206,7 +201,7 @@ class CameraSource(
         StreamingHandler?.post{
             start()
             while (thred_runnig){
-                jpegBytes?.let { sendToImg(it) }
+                imgBitmap?.let { sendToImg(it) }
                 SystemClock.sleep(250)
             }
         }
@@ -219,8 +214,10 @@ class CameraSource(
                 SystemClock.sleep(500)
             }
         }
+
         camera = openCamera(cameraManager, cameraId)
         imageReader = ImageReader.newInstance(PREVIEW_WIDTH_T, PREVIEW_HEIGHT_T, ImageFormat.YUV_420_888, 3)
+
         imageReader?.setOnImageAvailableListener({ reader -> // ImageReader가 새로운 이미지를 사용가능할 때 호출될 리스너 등록
             val image = reader.acquireLatestImage() // 큐에서 최신 이미지를 가져오고 오래된 이미지 삭제
             if (image != null) {
@@ -234,7 +231,8 @@ class CameraSource(
                 }
                 yuvConverter.yuvToRgb(image, imageBitmap)
                 // Create rotated version for portrait display
-                jpegBytes = convertImageToJpeg(imageBitmap)
+                imgBitmap = imageBitmap
+
                 val rotateMatrix = Matrix()
                 rotateMatrix.postRotate(90.0f)
 
@@ -289,13 +287,14 @@ class CameraSource(
         }
 
     fun prepareCamera() { // 어떤 카메라를 쓸지 결정하는 함수
-        for (cameraId in cameraManager.cameraIdList) {
-            val characteristics = cameraManager.getCameraCharacteristics(cameraId)
-            val deviceLevel = characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)
-            if (deviceLevel == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL){ // camera api를 다 지원하는 카메라로 설정
-                this.cameraId = cameraId
-            }
-        }
+//        for (cameraId in cameraManager.cameraIdList) {
+//            val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+//            val deviceLevel = characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)
+//            if (deviceLevel == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL){ // camera api를 다 지원하는 카메라로 설정
+//                this.cameraId = cameraId
+//            }
+//        }
+        this.cameraId = "0"
     }
 
     fun setDetector(detector: PoseDetector) {
@@ -318,10 +317,6 @@ class CameraSource(
         }
     }
 
-
-    /**
-     * Set Tracker for Movenet MuiltiPose model.
-     */
     fun setTracker(trackerType: TrackerType) {
         isTrackerEnabled = trackerType != TrackerType.OFF
         (this.detector as? MoveNetMultiPose)?.setTracker(trackerType)
@@ -330,17 +325,17 @@ class CameraSource(
     fun resume() {
         imageReaderThread = HandlerThread("imageReaderThread").apply { start() }
         imageReaderHandler = Handler(imageReaderThread!!.looper)
-        fpsTimer = Timer()
-        fpsTimer?.scheduleAtFixedRate(
-            object : TimerTask() {
-                override fun run() {
-                    framesPerSecond = frameProcessedInOneSecondInterval
-                    frameProcessedInOneSecondInterval = 0
-                }
-            },
-            0,
-            1000
-        )
+//        fpsTimer = Timer()
+//        fpsTimer?.scheduleAtFixedRate(
+//            object : TimerTask() {
+//                override fun run() {
+//                    framesPerSecond = frameProcessedInOneSecondInterval
+//                    frameProcessedInOneSecondInterval = 0
+//                }
+//            },
+//            0,
+//            1000
+//        )
     }
 
     fun close() {
@@ -358,10 +353,10 @@ class CameraSource(
         detector = null
         classifier?.close()
         classifier = null
-        fpsTimer?.cancel()
-        fpsTimer = null
-        frameProcessedInOneSecondInterval = 0
-        framesPerSecond = 0
+//        fpsTimer?.cancel()
+//        fpsTimer = null
+//        frameProcessedInOneSecondInterval = 0
+//        framesPerSecond = 0
     }
 
     // process image 이미지 분석 코드 ******************
@@ -381,11 +376,11 @@ class CameraSource(
                 }
             }
         }
-        frameProcessedInOneSecondInterval++
-        if (frameProcessedInOneSecondInterval == 1) {
-            // send fps to view
-            listener?.onFPSListener(framesPerSecond)
-        }
+//        frameProcessedInOneSecondInterval++
+//        if (frameProcessedInOneSecondInterval == 1) {
+//            // send fps to view
+//            listener?.onFPSListener(framesPerSecond)
+//        }
         // if the model returns only one item, show that item's score.
         if (persons.isNotEmpty()) {
             listener?.onDetectedInfo(persons[0].score, classificationResult)
@@ -462,7 +457,7 @@ class CameraSource(
                                         2
                                     }
                                     else{
-                                        0
+                                        0 // 중앙이면
                                     }
                                 }
 //                                showToast("Out of center grid by \n dx=$distanceToCenterGridX, dy=$distanceToCenterGridY")
