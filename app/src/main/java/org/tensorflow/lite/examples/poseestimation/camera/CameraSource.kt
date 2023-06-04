@@ -12,6 +12,7 @@ import android.media.ImageReader
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.util.Size
 import android.view.Surface
@@ -48,90 +49,65 @@ class CameraSource(
     private var dataInputStream: DataInputStream? = null
     private var dataOutputStream_motor: DataOutputStream? = null
 
-    private var h = Handler()
+    private var thred_runnig:Boolean = false
     private var check_person:Boolean = false
+    private var jpegBytes:ByteArray? = null
 
-    private var testd = object : Runnable {
-        override fun run() {
-            if (check_person) {
-                sendToRaspberryPi("@@@")
-            }
-            h.postDelayed(this, 1000L)
-        }
-    }
-
-    private fun starth(){
-        h.post(testd)
-    }
-    private fun stoph(){
-        h.removeCallbacks(testd)
-    }
+    var StreamingThread:HandlerThread? = null
+    var MotorThread:HandlerThread? = null
+    var StreamingHandler:Handler? = null
+    var MotorHandler:Handler? = null
 
     // 라즈베리 파이로 데이터 전송
     private fun sendToRaspberryPi(message: String) {
-        Thread {
-            try {
-                // 소켓과 DataOutputStream이 이미 열려 있는지 확인
-                if (socket_motor == null || socket_motor!!.isClosed) {
-                    return@Thread
-//                    socket_motor = Socket("192.168.35.151", 5555)
-//                    dataOutputStream_motor = DataOutputStream(socket_motor!!.getOutputStream())
-                }
-                // 메시지를 전송하고 줄 바꿈 문자를 추가하여 메시지의 끝을 표시
-                dataOutputStream_motor?.write(message.toByteArray())
-                dataOutputStream_motor?.flush()
-            } catch (e: Exception) {
-                e.printStackTrace()
+        try {
+            // 소켓과 DataOutputStream이 이미 열려 있는지 확인
+            if (socket_motor == null || socket_motor!!.isClosed) {
+                return
             }
-        }.start()
+            dataOutputStream_motor?.write(message.toByteArray())
+            dataOutputStream_motor?.flush()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun sendToImg(img : ByteArray) {
-        Thread {
-            try {
-                // 소켓과 DataOutputStream이 이미 열려 있는지 확인
-                if (socket == null || socket!!.isClosed) {
-                    return@Thread
-//                    socket = Socket("192.168.35.151", 9000)
-//                    dataOutputStream = DataOutputStream(socket!!.getOutputStream())
-//                    dataInputStream = DataInputStream(socket!!.getInputStream())
-                }
-
-                dataInputStream?.readByte() // start 수신
-                val imageSizeBytes = img.size.toString().toByteArray()
-                dataOutputStream?.write(imageSizeBytes)
-                dataOutputStream?.flush()
-
-                dataInputStream?.readByte() // image 수신
-                dataOutputStream?.write(img)
-                dataOutputStream?.flush()
-            } catch (e: Exception) {
-                e.printStackTrace()
+        try {
+            // 소켓과 DataOutputStream이 이미 열려 있는지 확인
+            if (socket == null || socket!!.isClosed) {
+                return
             }
-        }.start()
+
+            dataInputStream?.readByte() // start 수신
+            val imageSizeBytes = img.size.toString().toByteArray()
+            dataOutputStream?.write(imageSizeBytes)
+
+            dataInputStream?.readByte() // image 수신
+            dataOutputStream?.write(img)
+            dataOutputStream?.flush()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     // 앱이 시작될 때 Socket과 DataOutputStream을 초기화
     private fun start() {
-        Thread {
-            try {
-                socket = Socket("192.168.35.151", 9000)
-                dataOutputStream = DataOutputStream(socket!!.getOutputStream())
-                dataInputStream = DataInputStream(socket!!.getInputStream())
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }.start()
+        try {
+            socket = Socket("192.168.2.1", 9000)
+            dataOutputStream = DataOutputStream(socket!!.getOutputStream())
+            dataInputStream = DataInputStream(socket!!.getInputStream())
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
     private fun start_motor() {
-        Thread {
-            try {
-                socket_motor = Socket("192.168.35.151", 5555)
-                dataOutputStream_motor = DataOutputStream(socket_motor!!.getOutputStream())
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }.start()
+        try {
+            socket_motor = Socket("192.168.2.1", 8888)
+            dataOutputStream_motor = DataOutputStream(socket_motor!!.getOutputStream())
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     // 앱이 종료될 때 Socket과 DataOutputStream을 닫음
@@ -145,7 +121,8 @@ class CameraSource(
                 dataOutputStream_motor?.close()
                 socket_motor?.close()
 
-                stoph()
+//                motor_handler_stop()
+//                stream_handler_stop()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -218,10 +195,30 @@ class CameraSource(
     private var cameraId: String = ""
 
     suspend fun initCamera() {
-        start() // 웹서버와 통신 시작
-        start_motor() // 모터와 통신 시작
         checkCameraSupport()
-        starth() // 모터 확인(수시)
+        thred_runnig = true
+        StreamingThread = HandlerThread("StreamingThread")
+        MotorThread = HandlerThread("MotorThread")
+        StreamingThread?.start()
+        MotorThread?.start()
+        StreamingHandler = StreamingThread?.looper?.let { Handler(it) }
+        MotorHandler = MotorThread?.looper?.let { Handler(it) }
+        StreamingHandler?.post{
+            start()
+            while (thred_runnig){
+                jpegBytes?.let { sendToImg(it) }
+                SystemClock.sleep(250)
+            }
+        }
+        MotorHandler?.post{
+            start_motor()
+            while (thred_runnig){
+                if (check_person){
+                    sendToRaspberryPi("@@@")
+                }
+                SystemClock.sleep(500)
+            }
+        }
         camera = openCamera(cameraManager, cameraId)
         imageReader = ImageReader.newInstance(PREVIEW_WIDTH_T, PREVIEW_HEIGHT_T, ImageFormat.YUV_420_888, 3)
         imageReader?.setOnImageAvailableListener({ reader -> // ImageReader가 새로운 이미지를 사용가능할 때 호출될 리스너 등록
@@ -237,8 +234,7 @@ class CameraSource(
                 }
                 yuvConverter.yuvToRgb(image, imageBitmap)
                 // Create rotated version for portrait display
-                val jpegBytes = convertImageToJpeg(imageBitmap)
-                sendToImg(jpegBytes)
+                jpegBytes = convertImageToJpeg(imageBitmap)
                 val rotateMatrix = Matrix()
                 rotateMatrix.postRotate(90.0f)
 
@@ -349,6 +345,8 @@ class CameraSource(
 
     fun close() {
         stop()
+        thred_runnig = false
+        check_person = false
         session?.close()
         session = null
         camera?.close()
