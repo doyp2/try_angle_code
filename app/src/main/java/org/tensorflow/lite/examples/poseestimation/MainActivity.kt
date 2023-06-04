@@ -18,6 +18,7 @@ package org.tensorflow.lite.examples.poseestimation
 
 import android.Manifest
 import android.app.AlertDialog
+import android.app.Application
 import android.app.Dialog
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -37,10 +38,32 @@ import kotlinx.coroutines.launch
 import org.tensorflow.lite.examples.poseestimation.camera.CameraSource
 import org.tensorflow.lite.examples.poseestimation.data.Device
 import org.tensorflow.lite.examples.poseestimation.ml.*
-import org.tensorflow.lite.examples.poseestimation.data.BodyPart
 import android.widget.Toast
 import android.widget.Button
+import android.content.ContentValues
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Bitmap.CompressFormat
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import java.util.Calendar
 
+
+class MyApp : Application() {
+    lateinit var context: Context
+    init {
+        instance = this
+    }
+    companion object{
+        private var instance: MyApp? = null
+        fun applicationContext(): Context {
+            return instance!!.applicationContext
+        }
+    }
+}
 
 class MainActivity : AppCompatActivity() {
     private var screenHeight = 0
@@ -473,10 +496,46 @@ class MainActivity : AppCompatActivity() {
         companion object {
             @JvmStatic
             private val ARG_MESSAGE = "message"
+
             @JvmStatic
             fun newInstance(message: String): ErrorDialog = ErrorDialog().apply {
                 arguments = Bundle().apply { putString(ARG_MESSAGE, message) }
             }
         }
     }
+}
+
+fun save_img(context: Context, bitmap: Bitmap) {
+    val fileName = "test123"
+    val format = Bitmap.CompressFormat.JPEG
+    saveImageToGallery(context, bitmap, fileName, format)
+}
+
+private fun saveImageToGallery(context: Context, bitmap: Bitmap, fileName: String, format: Bitmap.CompressFormat): Uri? {
+    val contentValues = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+        put(MediaStore.MediaColumns.MIME_TYPE, "image/" + format.name.substring(format.name.lastIndexOf(".") + 1))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
+        }
+    }
+
+    val contentUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+    } else {
+        MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+    }
+
+    val imageUri = context.contentResolver.insert(contentUri, contentValues)
+
+    imageUri?.let {
+        context.contentResolver.openOutputStream(it)?.use { outputStream ->
+            bitmap.compress(format, 100, outputStream)
+        }
+    } ?: return null
+
+    // 갤러리에 추가
+    context.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, imageUri))
+
+    return imageUri
 }

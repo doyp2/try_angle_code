@@ -17,9 +17,12 @@ import android.util.Log
 import android.util.Size
 import android.view.Surface
 import android.view.SurfaceView
+import android.widget.Toast
+import androidx.core.content.ContentProviderCompat.requireContext
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.tensorflow.lite.examples.poseestimation.MainActivity
+import org.tensorflow.lite.examples.poseestimation.MyApp.Companion.applicationContext
 import org.tensorflow.lite.examples.poseestimation.VisualizationUtils
 import org.tensorflow.lite.examples.poseestimation.YuvToRgbConverter
 import org.tensorflow.lite.examples.poseestimation.data.Person
@@ -27,6 +30,7 @@ import org.tensorflow.lite.examples.poseestimation.ml.MoveNetMultiPose
 import org.tensorflow.lite.examples.poseestimation.ml.PoseClassifier
 import org.tensorflow.lite.examples.poseestimation.ml.PoseDetector
 import org.tensorflow.lite.examples.poseestimation.ml.TrackerType
+import org.tensorflow.lite.examples.poseestimation.save_img
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
@@ -41,13 +45,14 @@ class CameraSource(
     private val listener: CameraSourceListener? = null,
 ) {
     var latestPerson: Person? = null
-
+    var setDir: Int = 0
     // Socket과 DataOutputStream을 멤버 변수로 추가
     private var socket: Socket? = null
     private var socket_motor: Socket? = null
     private var dataOutputStream: DataOutputStream? = null
     private var dataInputStream: DataInputStream? = null
     private var dataOutputStream_motor: DataOutputStream? = null
+    private var dataInputStream_motor: DataInputStream? = null
 
     private var thred_runnig:Boolean = false
     private var check_person:Boolean = false
@@ -59,14 +64,26 @@ class CameraSource(
     var MotorHandler:Handler? = null
 
     // 라즈베리 파이로 데이터 전송
-    private fun sendToRaspberryPi(message: String) {
+    private fun sendToRaspberryPi() {
         try {
             // 소켓과 DataOutputStream이 이미 열려 있는지 확인
             if (socket_motor == null || socket_motor!!.isClosed) {
                 return
             }
-            dataOutputStream_motor?.write(message.toByteArray())
+            val msg = setDir.toString()
+            dataOutputStream_motor?.write(msg.toByteArray())
             dataOutputStream_motor?.flush()
+
+            val center_count = dataInputStream_motor?.readByte()?.toInt()?.toChar()?.toString()?.toInt()
+            println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%$center_count")
+            if(center_count == 8){
+                val uri = imgBitmap?.let { save_img(applicationContext(), it) }
+                if (uri != null) {
+                    Toast.makeText(applicationContext(), "이미지 저장 완료", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(applicationContext(), "이미지 저장 실패", Toast.LENGTH_SHORT).show()
+                }
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -79,10 +96,11 @@ class CameraSource(
                 return
             }
             val imgB = convertImageToJpeg(img)
+            val imageSizeBytes = imgB.size.toString().toByteArray()
 
             dataInputStream?.readByte() // start 수신
-            val imageSizeBytes = imgB.size.toString().toByteArray()
             dataOutputStream?.write(imageSizeBytes)
+            dataOutputStream?.flush()
 
             dataInputStream?.readByte() // image 수신
             dataOutputStream?.write(imgB)
@@ -106,6 +124,7 @@ class CameraSource(
         try {
             socket_motor = Socket("192.168.2.1", 8888)
             dataOutputStream_motor = DataOutputStream(socket_motor!!.getOutputStream())
+            dataInputStream_motor = DataInputStream(socket_motor!!.getInputStream())
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -118,6 +137,7 @@ class CameraSource(
             dataInputStream?.close()
             socket?.close()
             dataOutputStream_motor?.close()
+            dataInputStream_motor?.close()
             socket_motor?.close()
         } catch (e: Exception) {
             e.printStackTrace()
@@ -209,7 +229,7 @@ class CameraSource(
             start_motor()
             while (thred_runnig){
                 if (check_person){
-                    sendToRaspberryPi("@@@")
+                    sendToRaspberryPi()
                 }
                 SystemClock.sleep(500)
             }
@@ -340,6 +360,7 @@ class CameraSource(
 
     fun close() {
         stop()
+        setDir = 0
         thred_runnig = false
         check_person = false
         session?.close()
@@ -361,7 +382,6 @@ class CameraSource(
 
     // process image 이미지 분석 코드 ******************
     private fun processImage(bitmap: Bitmap) {
-        var setDir = 0
         var check_center : Boolean = false
         val persons = mutableListOf<Person>()
         var classificationResult: List<Pair<String, Float>>? = null
@@ -434,8 +454,9 @@ class CameraSource(
                             // The person is in the center grid and entire person is within the frame
                             if (isCenterXInMiddleGrid && isCenterYInMiddleGrid) {
                                 check_center = true
-                                showToast("가운데에 있다")
+                                setDir = 5
                             } else { // 가운데에 있지않다면
+                                check_center = false
                                 // The object is out of the center grid, show the distance to the center grid
                                 val distanceToCenterGridX = when {
                                     center.x <= widthThird -> widthThird - center.x
