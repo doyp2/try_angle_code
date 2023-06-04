@@ -397,7 +397,6 @@ class MainActivity : AppCompatActivity() {
                 if (device == Device.GPU) {
                     showToast(getString(R.string.tfe_pe_gpu_error))
                 }
-                println("*******************************showTracker Start")
                 showTracker(true)
                 MoveNetMultiPose.create(
                     this,

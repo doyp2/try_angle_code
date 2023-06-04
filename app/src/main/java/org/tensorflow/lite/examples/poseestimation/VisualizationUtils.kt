@@ -60,10 +60,10 @@ object VisualizationUtils {
     // Draw line and point indicate body pose
     fun drawBodyKeypoints(
         input: Bitmap,
-        persons: List<Person>,
+        person: Person?,
         isTrackerEnabled: Boolean = false,
         setColor: Int,
-        dir: Int
+        dir: String
     ): Bitmap {
         val paintCircle = Paint().apply { // 관절 원
             strokeWidth = CIRCLE_RADIUS
@@ -100,15 +100,22 @@ object VisualizationUtils {
         val heightThird = input.height / 3f
 
         for (i in 1..2) {
-            originalSizeCanvas.drawLine(i * widthThird, 0f, i * widthThird, input.height.toFloat(), gridPaint)
-            originalSizeCanvas.drawLine(0f, i * heightThird, input.width.toFloat(), i * heightThird, gridPaint)
+            originalSizeCanvas.drawLine(
+                i * widthThird,
+                0f,
+                i * widthThird,
+                input.height.toFloat(),
+                gridPaint
+            )
+            originalSizeCanvas.drawLine(
+                0f,
+                i * heightThird,
+                input.width.toFloat(),
+                i * heightThird,
+                gridPaint
+            )
         }
-        // 사람 한명만 감지
-        var personsT = mutableListOf<Person>()
-        if(persons.isNotEmpty()){
-            personsT.add(persons[0])
-        }
-        personsT.forEach { person ->
+        if (person != null) {
             // draw person id if tracker is enable
             if (isTrackerEnabled) {
                 person.boundingBox?.let {
@@ -141,7 +148,8 @@ object VisualizationUtils {
 
             // 중심부 점 찍기
             fun drawCenter(): PointF? {
-                val centerPoints = person.keyPoints.filter { it.bodyPart == BodyPart.NOSE || it.bodyPart == BodyPart.LEFT_HIP || it.bodyPart == BodyPart.RIGHT_HIP }
+                val centerPoints =
+                    person.keyPoints.filter { it.bodyPart == BodyPart.NOSE || it.bodyPart == BodyPart.LEFT_HIP || it.bodyPart == BodyPart.RIGHT_HIP }
                 // Check if centerPoints is empty before calculating average x, y coordinates
                 if (centerPoints.isEmpty()) {
                     return null
@@ -165,26 +173,25 @@ object VisualizationUtils {
                 style = Paint.Style.STROKE
             }
 
-            if(dir == 1){
-                originalSizeCanvas.drawLine(40f,320f,120f,320f,paintArrow)
-                originalSizeCanvas.drawLine(40f,320f,60f,340f,paintArrow)
-                originalSizeCanvas.drawLine(40f,320f,60f,300f,paintArrow)
+            if (dir == "left") {
+                originalSizeCanvas.drawLine(40f, 320f, 120f, 320f, paintArrow)
+                originalSizeCanvas.drawLine(40f, 320f, 60f, 340f, paintArrow)
+                originalSizeCanvas.drawLine(40f, 320f, 60f, 300f, paintArrow)
             }
-            if(dir == -1){
-                originalSizeCanvas.drawLine(360f,320f,440f,320f,paintArrow)
-                originalSizeCanvas.drawLine(420f,340f,440f,320f,paintArrow)
-                originalSizeCanvas.drawLine(420f,300f,440f,320f,paintArrow)
+            if (dir == "right") {
+                originalSizeCanvas.drawLine(360f, 320f, 440f, 320f, paintArrow)
+                originalSizeCanvas.drawLine(420f, 340f, 440f, 320f, paintArrow)
+                originalSizeCanvas.drawLine(420f, 300f, 440f, 320f, paintArrow)
             }
-            if (dir == -2){
-                originalSizeCanvas.drawLine(240f,20f,240f,60f,paintArrow)
-                originalSizeCanvas.drawLine(230f,30f,240f,20f,paintArrow)
-                originalSizeCanvas.drawLine(250f,30f,240f,20f,paintArrow)
+            if (dir == "up") {
+                originalSizeCanvas.drawLine(240f, 20f, 240f, 60f, paintArrow)
+                originalSizeCanvas.drawLine(230f, 30f, 240f, 20f, paintArrow)
+                originalSizeCanvas.drawLine(250f, 30f, 240f, 20f, paintArrow)
             }
-            if (dir == 2){
-                originalSizeCanvas.drawLine(240f,620f,240f,580f,paintArrow)
-                originalSizeCanvas.drawLine(230f,610f,240f,620f,paintArrow)
-                originalSizeCanvas.drawLine(250f,610f,240f,620f,paintArrow)
-
+            if (dir == "down") {
+                originalSizeCanvas.drawLine(240f, 620f, 240f, 580f, paintArrow)
+                originalSizeCanvas.drawLine(230f, 610f, 240f, 620f, paintArrow)
+                originalSizeCanvas.drawLine(250f, 610f, 240f, 620f, paintArrow)
             }
         }
         return output

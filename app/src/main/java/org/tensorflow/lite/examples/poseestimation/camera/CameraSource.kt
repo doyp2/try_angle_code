@@ -45,7 +45,7 @@ class CameraSource(
     private val listener: CameraSourceListener? = null,
 ) {
     var latestPerson: Person? = null
-    var setDir: Int = 0
+    lateinit var setDir: String
     // Socket과 DataOutputStream을 멤버 변수로 추가
     private var socket: Socket? = null
     private var socket_motor: Socket? = null
@@ -70,12 +70,10 @@ class CameraSource(
             if (socket_motor == null || socket_motor!!.isClosed) {
                 return
             }
-            val msg = setDir.toString()
-            dataOutputStream_motor?.write(msg.toByteArray())
+            dataOutputStream_motor?.write(setDir.toByteArray())
             dataOutputStream_motor?.flush()
 
             val center_count = dataInputStream_motor?.readByte()?.toInt()?.toChar()?.toString()?.toInt()
-            println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%$center_count")
             if(center_count == 8){
                 val uri = imgBitmap?.let { save_img(applicationContext(), it) }
                 if (uri != null) {
@@ -122,7 +120,7 @@ class CameraSource(
     }
     private fun start_motor() {
         try {
-            socket_motor = Socket("192.168.2.1", 8888)
+            socket_motor = Socket("192.168.35.151", 8888)
             dataOutputStream_motor = DataOutputStream(socket_motor!!.getOutputStream())
             dataInputStream_motor = DataInputStream(socket_motor!!.getInputStream())
         } catch (e: Exception) {
@@ -210,6 +208,7 @@ class CameraSource(
     private var cameraId: String = ""
 
     suspend fun initCamera() {
+        setDir = "0"
         checkCameraSupport()
         thred_runnig = true
         StreamingThread = HandlerThread("StreamingThread")
@@ -360,7 +359,7 @@ class CameraSource(
 
     fun close() {
         stop()
-        setDir = 0
+        setDir = "0"
         thred_runnig = false
         check_person = false
         session?.close()
@@ -382,6 +381,7 @@ class CameraSource(
 
     // process image 이미지 분석 코드 ******************
     private fun processImage(bitmap: Bitmap) {
+        var person: Person? = null
         var check_center : Boolean = false
         val persons = mutableListOf<Person>()
         var classificationResult: List<Pair<String, Float>>? = null
@@ -396,19 +396,22 @@ class CameraSource(
                 }
             }
         }
+
 //        frameProcessedInOneSecondInterval++
 //        if (frameProcessedInOneSecondInterval == 1) {
 //            // send fps to view
 //            listener?.onFPSListener(framesPerSecond)
 //        }
         // if the model returns only one item, show that item's score.
-        if (persons.isNotEmpty()) {
-            listener?.onDetectedInfo(persons[0].score, classificationResult)
-        }
         // 사람 객체가 있으면 실행
         if (persons.isNotEmpty()) {
+            var personsT = mutableListOf<Person>()
+            if(persons.isNotEmpty()){
+                personsT.add(persons[0])
+            }
             check_person = true
-            val person = persons[0]
+            person = personsT[0]
+            listener?.onDetectedInfo(person.score, classificationResult)
             if (MainActivity.adjustMode) { // 전신확인 단계일 경우 ***************
                 if(person.score > MIN_CONFIDENCE) {
                     val (ankle, shoulder) = person.getAnkleAndShoulder()
@@ -433,8 +436,8 @@ class CameraSource(
             } else { // 중앙확인 단계일 경우 **************
                 val center = person.getCenter()
                 if (center != null) {
-                    val targetX = bitmap.width / 2f // 중앙 x 좌표
-                    val targetY = bitmap.height / 2f // 중앙 y 좌표
+                    val targetX = bitmap.width / 2f // 중앙 x 좌표 480/2 = 240
+                    val targetY = bitmap.height / 2f // 중앙 y 좌표 640/2 = 320
                     val distanceX = targetX - center.x // 중앙 x 좌표 - 사람 x 좌표
                     val distanceY = targetY - center.y // 중앙 y 좌표 - 사람 y 좌표
 
@@ -444,17 +447,20 @@ class CameraSource(
                     // 중앙 확인 코드
                     val widthThird = bitmap.width / 3f // 480/3 = 120
                     val heightThird = bitmap.height / 3f // 640/3 = 213.33
+                    // 중앙 범위 조정 코드
                     val isCenterXInMiddleGrid = center.x > widthThird + 40f && center.x < (2*widthThird) - 40f
                     val isCenterYInMiddleGrid = center.y > heightThird + 80f && center.y < (2*heightThird) - 80f
+
                     val personBoundingBox = person.boundingBox
                     if (personBoundingBox != null) {
                         val isPersonInFrame = personBoundingBox.left >= 0 && personBoundingBox.top >= 0 &&
                                 personBoundingBox.right <= PREVIEW_WIDTH_T && personBoundingBox.bottom <= PREVIEW_HEIGHT_T
                         if (person.isFullBodyDetected() && isPersonInFrame) {
                             // The person is in the center grid and entire person is within the frame
+                            println("****************************************************"+targetX+"********"+center.x)
                             if (isCenterXInMiddleGrid && isCenterYInMiddleGrid) {
                                 check_center = true
-                                setDir = 5
+                                setDir = "center"
                             } else { // 가운데에 있지않다면
                                 check_center = false
                                 // The object is out of the center grid, show the distance to the center grid
@@ -466,21 +472,22 @@ class CameraSource(
                                     center.y <= heightThird -> heightThird - center.y
                                     else -> center.y - 2 * heightThird
                                 }
-                                setDir = if (center.x < targetX - 10f){
-                                    -1
-                                } else if (center.x > targetX + 10f){
-                                    1
+                                setDir = if (center.x < targetX - 10f){ // 객체의 x 좌표가 목표의 x보다 작으면 (객체가 왼쪽에 있음)
+                                    "left" // 왼쪽으로 이동해서 객체를 오른쪽으로 이동
+                                } else if (center.x > targetX + 10f){ // 객체의 x 좌표가 목표의 x보다 크면 (객체가 오른쪽에 있음)
+                                    "right"
                                 } else{
-                                    if (center.y < targetY - 10f){
-                                        -2
+                                    if (center.y < targetY - 10f){ // 객체의 y 좌표가 목표의 y보다 작으면 (객체가 위에 있음)
+                                        "up"
                                     }
-                                    else if (center.y > targetY + 10f){
-                                        2
+                                    else if (center.y > targetY + 10f){ // 객체의 y 좌표가 목표의 y보다 크면 (객체가 아래에 있음)
+                                        "down"
                                     }
                                     else{
-                                        0 // 중앙이면
+                                        "0"
                                     }
                                 }
+                                println("****************************************************"+setDir)
 //                                showToast("Out of center grid by \n dx=$distanceToCenterGridX, dy=$distanceToCenterGridY")
                             }
                         }
@@ -489,9 +496,10 @@ class CameraSource(
             }
         }
         else{
+            person = null
             check_person = false
         }
-        visualize(persons, bitmap, check_center, setDir)
+        visualize(person, bitmap, check_center, setDir)
     }
     // In CameraSource class
     //    showToast 메소드가 메인 스레드에서 호출되면 즉시 onDistanceUpdate 메소드를 호출하고,
@@ -506,12 +514,12 @@ class CameraSource(
         }
     }
 
-    private fun visualize(persons: List<Person>, bitmap: Bitmap, check_center: Boolean, setDir: Int) {
+    private fun visualize(person: Person?, bitmap: Bitmap, check_center: Boolean, setDir: String) {
         // +check_center 변수 추가해서 중앙이면 다르게 그리게
         val setC : Int = if (check_center) { Color.GREEN } else { Color.RED }
         val outputBitmap = VisualizationUtils.drawBodyKeypoints(
             bitmap,
-            persons.filter { it.score > MIN_CONFIDENCE },
+            person,
             isTrackerEnabled,
             setC,
             setDir
