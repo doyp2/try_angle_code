@@ -193,6 +193,16 @@ object VisualizationUtils {
                 originalSizeCanvas.drawLine(230f, 610f, 240f, 620f, paintArrow)
                 originalSizeCanvas.drawLine(250f, 610f, 240f, 620f, paintArrow)
             }
+            if (dir == "front") {
+                originalSizeCanvas.drawLine(240f, 20f, 240f, 60f, paintArrow)
+                originalSizeCanvas.drawLine(230f, 30f, 240f, 20f, paintArrow)
+                originalSizeCanvas.drawLine(250f, 30f, 240f, 20f, paintArrow)
+            }
+            if (dir == "back") {
+                originalSizeCanvas.drawLine(240f, 620f, 240f, 580f, paintArrow)
+                originalSizeCanvas.drawLine(230f, 610f, 240f, 620f, paintArrow)
+                originalSizeCanvas.drawLine(250f, 610f, 240f, 620f, paintArrow)
+            }
         }
         return output
     }

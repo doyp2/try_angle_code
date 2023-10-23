@@ -74,7 +74,7 @@ class CameraSource(
             dataOutputStream_motor?.flush()
 
             val center_count = dataInputStream_motor?.readByte()?.toInt()?.toChar()?.toString()?.toInt()
-            if(center_count == 8){
+            if(center_count == 4){
                 val uri = imgBitmap?.let { save_img(applicationContext(), it) }
                 if (uri != null) {
                     Toast.makeText(applicationContext(), "이미지 저장 완료", Toast.LENGTH_SHORT).show()
@@ -120,7 +120,7 @@ class CameraSource(
     }
     private fun start_motor() {
         try {
-            socket_motor = Socket("192.168.35.151", 8888)
+            socket_motor = Socket("192.168.2.1", 8888)
             dataOutputStream_motor = DataOutputStream(socket_motor!!.getOutputStream())
             dataInputStream_motor = DataInputStream(socket_motor!!.getInputStream())
         } catch (e: Exception) {
@@ -221,7 +221,7 @@ class CameraSource(
             start()
             while (thred_runnig){
                 imgBitmap?.let { sendToImg(it) }
-                SystemClock.sleep(250)
+                SystemClock.sleep(150)
             }
         }
         MotorHandler?.post{
@@ -412,84 +412,81 @@ class CameraSource(
             check_person = true
             person = personsT[0]
             listener?.onDetectedInfo(person.score, classificationResult)
+
+            val center = person.getCenter()
+            if (center != null) {
+                val targetX = bitmap.width / 2f // 중앙 x 좌표 480/2 = 240
+                val targetY = bitmap.height / 2f // 중앙 y 좌표 640/2 = 320
+                val distanceX = targetX - center.x // 중앙 x 좌표 - 사람 x 좌표
+                val distanceY = targetY - center.y // 중앙 y 좌표 - 사람 y 좌표
+
+//                    if(person.score > MIN_CONFIDENCE){
+//                        showToast("객체가 중앙으로부터 X: ${distanceX}, Y: ${distanceY}만큼 떨어져 있습니다.")
+//                    }
+                // 중앙 확인 코드
+                val widthThird = bitmap.width / 3f // 480/3 = 120
+                val heightThird = bitmap.height / 3f // 640/3 = 213.33
+                // 중앙 범위 조정 코드
+                val isCenterXInMiddleGrid = center.x > widthThird + 40f && center.x < (2*widthThird) - 40f
+                val isCenterYInMiddleGrid = center.y > heightThird + 80f && center.y < (2*heightThird) - 80f
+
+                val personBoundingBox = person.boundingBox
+                if (personBoundingBox != null) {
+                    val isPersonInFrame = personBoundingBox.left >= 0 && personBoundingBox.top >= 0 &&
+                            personBoundingBox.right <= PREVIEW_WIDTH_T && personBoundingBox.bottom <= PREVIEW_HEIGHT_T
+                    if (person.isFullBodyDetected() && isPersonInFrame) {
+                        // The person is in the center grid and entire person is within the frame
+                        if (isCenterXInMiddleGrid && isCenterYInMiddleGrid) {
+                            check_center = true
+                            setDir = "center"
+                            MainActivity.adjustMode = true
+                        } else { // 가운데에 있지않다면
+                            check_center = false
+                            MainActivity.adjustMode = false
+                            // The object is out of the center grid, show the distance to the center grid
+                            val distanceToCenterGridX = when {
+                                center.x <= widthThird -> widthThird - center.x
+                                else -> center.x - 2 * widthThird
+                            }
+                            val distanceToCenterGridY = when {
+                                center.y <= heightThird -> heightThird - center.y
+                                else -> center.y - 2 * heightThird
+                            }
+                            setDir = if (center.x < targetX - 10f){ // 객체의 x 좌표가 목표의 x보다 작으면 (객체가 왼쪽에 있음)
+                                "left" // 왼쪽으로 이동해서 객체를 오른쪽으로 이동
+                            } else if (center.x > targetX + 10f){ // 객체의 x 좌표가 목표의 x보다 크면 (객체가 오른쪽에 있음)
+                                "right"
+                            } else{
+                                if (center.y < targetY - 10f){ // 객체의 y 좌표가 목표의 y보다 작으면 (객체가 위에 있음)
+                                    "up"
+                                }
+                                else if (center.y > targetY + 10f){ // 객체의 y 좌표가 목표의 y보다 크면 (객체가 아래에 있음)
+                                    "down"
+                                }
+                                else{
+                                    "0"
+                                }
+                            }
+//                                showToast("Out of center grid by \n dx=$distanceToCenterGridX, dy=$distanceToCenterGridY")
+                        }
+                    }
+                }
+            }
             if (MainActivity.adjustMode) { // 전신확인 단계일 경우 ***************
                 if(person.score > MIN_CONFIDENCE) {
                     val (ankle, shoulder) = person.getAnkleAndShoulder()
 
                     if (ankle != null) {
                         val targetAnkleY = bitmap.height.toFloat() - 60f
-                        if (ankle.y < targetAnkleY) {
-                            showToast("발목이 하단으로부터 ${targetAnkleY - ankle.y}만큼 위에 있습니다. 아래로 이동해주세요.")
-                        } else {
-                            showToast("발목이 하단으로부터 ${ankle.y - targetAnkleY}만큼 아래에 있습니다. 위로 이동해주세요.")
+                        if (ankle.y < targetAnkleY + 10f && ankle.y > targetAnkleY - 10f ){
+                            setDir = "good"
                         }
-                    }
-                }
-//                if (shoulder != null) {
-//                    val targetShoulderY = bitmap.height * 1 / 3f
-//                    if (shoulder.y < targetShoulderY) {
-//                        showToast("어깨가 상단 2/3 지점으로부터 ${targetShoulderY - shoulder.y}만큼 위에 있습니다. 아래로 이동해주세요.")
-//                    } else {
-//                        showToast("어깨가 상단 2/3 지점으로부터 ${shoulder.y - targetShoulderY}만큼 아래에 있습니다. 위로 이동해주세요.")
-//                    }
-//                }
-            } else { // 중앙확인 단계일 경우 **************
-                val center = person.getCenter()
-                if (center != null) {
-                    val targetX = bitmap.width / 2f // 중앙 x 좌표 480/2 = 240
-                    val targetY = bitmap.height / 2f // 중앙 y 좌표 640/2 = 320
-                    val distanceX = targetX - center.x // 중앙 x 좌표 - 사람 x 좌표
-                    val distanceY = targetY - center.y // 중앙 y 좌표 - 사람 y 좌표
-
-//                    if(person.score > MIN_CONFIDENCE){
-//                        showToast("객체가 중앙으로부터 X: ${distanceX}, Y: ${distanceY}만큼 떨어져 있습니다.")
-//                    }
-                    // 중앙 확인 코드
-                    val widthThird = bitmap.width / 3f // 480/3 = 120
-                    val heightThird = bitmap.height / 3f // 640/3 = 213.33
-                    // 중앙 범위 조정 코드
-                    val isCenterXInMiddleGrid = center.x > widthThird + 40f && center.x < (2*widthThird) - 40f
-                    val isCenterYInMiddleGrid = center.y > heightThird + 80f && center.y < (2*heightThird) - 80f
-
-                    val personBoundingBox = person.boundingBox
-                    if (personBoundingBox != null) {
-                        val isPersonInFrame = personBoundingBox.left >= 0 && personBoundingBox.top >= 0 &&
-                                personBoundingBox.right <= PREVIEW_WIDTH_T && personBoundingBox.bottom <= PREVIEW_HEIGHT_T
-                        if (person.isFullBodyDetected() && isPersonInFrame) {
-                            // The person is in the center grid and entire person is within the frame
-                            println("****************************************************"+targetX+"********"+center.x)
-                            if (isCenterXInMiddleGrid && isCenterYInMiddleGrid) {
-                                check_center = true
-                                setDir = "center"
-                            } else { // 가운데에 있지않다면
-                                check_center = false
-                                // The object is out of the center grid, show the distance to the center grid
-                                val distanceToCenterGridX = when {
-                                    center.x <= widthThird -> widthThird - center.x
-                                    else -> center.x - 2 * widthThird
-                                }
-                                val distanceToCenterGridY = when {
-                                    center.y <= heightThird -> heightThird - center.y
-                                    else -> center.y - 2 * heightThird
-                                }
-                                setDir = if (center.x < targetX - 10f){ // 객체의 x 좌표가 목표의 x보다 작으면 (객체가 왼쪽에 있음)
-                                    "left" // 왼쪽으로 이동해서 객체를 오른쪽으로 이동
-                                } else if (center.x > targetX + 10f){ // 객체의 x 좌표가 목표의 x보다 크면 (객체가 오른쪽에 있음)
-                                    "right"
-                                } else{
-                                    if (center.y < targetY - 10f){ // 객체의 y 좌표가 목표의 y보다 작으면 (객체가 위에 있음)
-                                        "up"
-                                    }
-                                    else if (center.y > targetY + 10f){ // 객체의 y 좌표가 목표의 y보다 크면 (객체가 아래에 있음)
-                                        "down"
-                                    }
-                                    else{
-                                        "0"
-                                    }
-                                }
-                                println("****************************************************"+setDir)
-//                                showToast("Out of center grid by \n dx=$distanceToCenterGridX, dy=$distanceToCenterGridY")
-                            }
+                        else if (ankle.y < targetAnkleY) {
+                            setDir = "front"
+//                            showToast("발목이 하단으로부터 ${targetAnkleY - ankle.y}만큼 위에 있습니다. 아래로 이동해주세요.")
+                        } else {
+                            setDir = "back"
+//                            showToast("발목이 하단으로부터 ${ankle.y - targetAnkleY}만큼 아래에 있습니다. 위로 이동해주세요.")
                         }
                     }
                 }
@@ -516,7 +513,14 @@ class CameraSource(
 
     private fun visualize(person: Person?, bitmap: Bitmap, check_center: Boolean, setDir: String) {
         // +check_center 변수 추가해서 중앙이면 다르게 그리게
-        val setC : Int = if (check_center) { Color.GREEN } else { Color.RED }
+        val setC : Int = if (check_center) {
+            if (setDir == "good"){
+                Color.GREEN
+            }
+            else {
+                Color.BLUE
+            }
+        } else { Color.RED }
         val outputBitmap = VisualizationUtils.drawBodyKeypoints(
             bitmap,
             person,
