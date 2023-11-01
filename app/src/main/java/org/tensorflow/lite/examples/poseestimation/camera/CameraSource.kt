@@ -63,6 +63,9 @@ class CameraSource(
     var StreamingHandler:Handler? = null
     var MotorHandler:Handler? = null
 
+    var currentTime:Long = 0L
+    var diffTime:Long = 0L
+
     // 라즈베리 파이로 데이터 전송
     private fun sendToRaspberryPi() {
         try {
@@ -73,15 +76,15 @@ class CameraSource(
             dataOutputStream_motor?.write(setDir.toByteArray())
             dataOutputStream_motor?.flush()
 
-            val center_count = dataInputStream_motor?.readByte()?.toInt()?.toChar()?.toString()?.toInt()
-            if(center_count == 4){
-                val uri = imgBitmap?.let { save_img(applicationContext(), it) }
-                if (uri != null) {
-                    Toast.makeText(applicationContext(), "이미지 저장 완료", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(applicationContext(), "이미지 저장 실패", Toast.LENGTH_SHORT).show()
-                }
-            }
+//            val center_count = dataInputStream_motor?.readByte()?.toInt()?.toChar()?.toString()?.toInt()
+//            if(center_count == 4){
+//                val uri = imgBitmap?.let { save_img(applicationContext(), it) }
+//                if (uri != null) {
+//                    Toast.makeText(applicationContext(), "이미지 저장 완료", Toast.LENGTH_SHORT).show()
+//                } else {
+//                    Toast.makeText(applicationContext(), "이미지 저장 실패", Toast.LENGTH_SHORT).show()
+//                }
+//            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -120,7 +123,7 @@ class CameraSource(
     }
     private fun start_motor() {
         try {
-            socket_motor = Socket("192.168.2.1", 8888)
+            socket_motor = Socket("192.168.112.109", 8888)
             dataOutputStream_motor = DataOutputStream(socket_motor!!.getOutputStream())
             dataInputStream_motor = DataInputStream(socket_motor!!.getInputStream())
         } catch (e: Exception) {
@@ -211,25 +214,28 @@ class CameraSource(
         setDir = "0"
         checkCameraSupport()
         thred_runnig = true
-        StreamingThread = HandlerThread("StreamingThread")
+//        StreamingThread = HandlerThread("StreamingThread")
         MotorThread = HandlerThread("MotorThread")
-        StreamingThread?.start()
+//        StreamingThread?.start()
         MotorThread?.start()
-        StreamingHandler = StreamingThread?.looper?.let { Handler(it) }
+//        StreamingHandler = StreamingThread?.looper?.let { Handler(it) }
         MotorHandler = MotorThread?.looper?.let { Handler(it) }
-        StreamingHandler?.post{
-            start()
-            while (thred_runnig){
-                imgBitmap?.let { sendToImg(it) }
-                SystemClock.sleep(150)
-            }
-        }
+        // 스트리밍 핸들러 등록
+//        StreamingHandler?.post{
+//            start()
+//            while (thred_runnig){
+//                imgBitmap?.let { sendToImg(it) }
+//                SystemClock.sleep(150)
+//            }
+//        }
+        // 모터 핸들러 등록
         MotorHandler?.post{
             start_motor()
             while (thred_runnig){
-                if (check_person){
-                    sendToRaspberryPi()
+                if (!check_person){
+                    setDir = "-1"
                 }
+                sendToRaspberryPi()
                 SystemClock.sleep(500)
             }
         }
@@ -253,7 +259,7 @@ class CameraSource(
                 imgBitmap = imageBitmap
 
                 val rotateMatrix = Matrix()
-                rotateMatrix.postRotate(90.0f)
+                rotateMatrix.postRotate(270.0f)
 
                 val rotatedBitmap = Bitmap.createBitmap(
                     imageBitmap, 0, 0, PREVIEW_WIDTH, PREVIEW_HEIGHT,
@@ -313,7 +319,7 @@ class CameraSource(
 //                this.cameraId = cameraId
 //            }
 //        }
-        this.cameraId = "0"
+        this.cameraId = "1"
     }
 
     fun setDetector(detector: PoseDetector) {
@@ -452,15 +458,15 @@ class CameraSource(
                                 center.y <= heightThird -> heightThird - center.y
                                 else -> center.y - 2 * heightThird
                             }
-                            setDir = if (center.x < targetX - 10f){ // 객체의 x 좌표가 목표의 x보다 작으면 (객체가 왼쪽에 있음)
-                                "left" // 왼쪽으로 이동해서 객체를 오른쪽으로 이동
-                            } else if (center.x > targetX + 10f){ // 객체의 x 좌표가 목표의 x보다 크면 (객체가 오른쪽에 있음)
-                                "right"
+                            setDir = if (center.x < targetX - 4f){ // 객체의 x 좌표가 목표의 x보다 작으면 (객체가 왼쪽에 있음)
+                                "right" // 오른쪽으로 이동해서 객체를 오른쪽으로 이동
+                            } else if (center.x > targetX + 4f){ // 객체의 x 좌표가 목표의 x보다 크면 (객체가 오른쪽에 있음)
+                                "left"
                             } else{
-                                if (center.y < targetY - 10f){ // 객체의 y 좌표가 목표의 y보다 작으면 (객체가 위에 있음)
+                                if (center.y < targetY - 4f){ // 객체의 y 좌표가 목표의 y보다 작으면 (객체가 위에 있음)
                                     "up"
                                 }
-                                else if (center.y > targetY + 10f){ // 객체의 y 좌표가 목표의 y보다 크면 (객체가 아래에 있음)
+                                else if (center.y > targetY + 4f){ // 객체의 y 좌표가 목표의 y보다 크면 (객체가 아래에 있음)
                                     "down"
                                 }
                                 else{
@@ -477,8 +483,8 @@ class CameraSource(
                     val (ankle, shoulder) = person.getAnkleAndShoulder()
 
                     if (ankle != null) {
-                        val targetAnkleY = bitmap.height.toFloat() - 60f
-                        if (ankle.y < targetAnkleY + 10f && ankle.y > targetAnkleY - 10f ){
+                        val targetAnkleY = bitmap.height.toFloat() - 70f
+                        if (ankle.y < targetAnkleY + 15f && ankle.y > targetAnkleY - 15f ){
                             setDir = "good"
                         }
                         else if (ankle.y < targetAnkleY) {
@@ -513,6 +519,7 @@ class CameraSource(
 
     private fun visualize(person: Person?, bitmap: Bitmap, check_center: Boolean, setDir: String) {
         // +check_center 변수 추가해서 중앙이면 다르게 그리게
+        currentTime = System.currentTimeMillis()
         val setC : Int = if (check_center) {
             if (setDir == "good"){
                 Color.GREEN
@@ -528,6 +535,19 @@ class CameraSource(
             setC,
             setDir
         )
+        if (setC == Color.GREEN){
+            if (((currentTime-diffTime)/1000) > 3){
+                val uri = imgBitmap?.let { save_img(applicationContext(), it) }
+                if (uri != null) {
+                    Toast.makeText(applicationContext(), "이미지 저장 완료", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(applicationContext(), "이미지 저장 실패", Toast.LENGTH_SHORT).show()
+                }
+                diffTime = System.currentTimeMillis()
+            }
+        } else {
+            diffTime = System.currentTimeMillis()
+        }
 
         val holder = surfaceView.holder
         val surfaceCanvas = holder.lockCanvas()

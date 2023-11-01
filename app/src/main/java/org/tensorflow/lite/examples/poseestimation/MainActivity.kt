@@ -45,11 +45,13 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Bitmap.CompressFormat
+import android.graphics.Matrix
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import java.util.Calendar
+import kotlin.system.exitProcess
 
 
 class MyApp : Application() {
@@ -507,7 +509,14 @@ class MainActivity : AppCompatActivity() {
 fun save_img(context: Context, bitmap: Bitmap) {
     val fileName = "test123"
     val format = Bitmap.CompressFormat.JPEG
-    saveImageToGallery(context, bitmap, fileName, format)
+    val rotateMatrix = Matrix()
+    rotateMatrix.postRotate(270.0f)
+    val rotatedBitmap = Bitmap.createBitmap(
+        bitmap, 0, 0, 640, 480,
+        rotateMatrix, false
+    )
+    saveImageToGallery(context, rotatedBitmap, fileName, format)
+    exitProcess(0)
 }
 
 private fun saveImageToGallery(context: Context, bitmap: Bitmap, fileName: String, format: Bitmap.CompressFormat): Uri? {
@@ -534,6 +543,7 @@ private fun saveImageToGallery(context: Context, bitmap: Bitmap, fileName: Strin
     } ?: return null
 
     // 갤러리에 추가
+
     context.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, imageUri))
 
     return imageUri
