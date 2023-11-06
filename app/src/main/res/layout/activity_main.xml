@@ -3,14 +3,16 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/black"
-    tools:context=".MainActivity">
+    tools:context=".MainActivity"
+    android:background="@color/white"
+    >
 
     <SurfaceView
         android:id="@+id/surfaceView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginBottom="160dp"/>
+        android:layout_marginTop="80dp"
+        android:layout_marginBottom="170dp"/>
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
@@ -19,15 +21,22 @@
 
     </androidx.appcompat.widget.Toolbar>
 
-    <Button
-        android:id="@+id/adjustButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/adjust_points" />
+    <ImageButton
+        android:id="@+id/gallery_button"
+        android:layout_width="162dp"
+        android:layout_height="95dp"
+        android:layout_gravity="bottom|end"
+        android:layout_marginBottom="40dp"
+        android:background="@color/white"
+        android:layout_marginRight="20dp"
+        android:contentDescription="@string/gallery_button_description"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_gallery_icon" />
+
 
     <include layout="@layout/bottom_sheet_layout"
         android:visibility="invisible"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="10dp" />
+        />
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

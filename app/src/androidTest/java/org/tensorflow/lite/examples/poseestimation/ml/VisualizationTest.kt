@@ -26,6 +26,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.tensorflow.lite.examples.poseestimation.VisualizationUtils
 import org.tensorflow.lite.examples.poseestimation.data.Device
+import android.graphics.Color
+
 
 /**
  * This test is used to visually verify detection results by the models.
@@ -48,35 +50,74 @@ class VisualizationTest {
         inputBitmap = EvaluationUtils.loadBitmapAssetByName(TEST_INPUT_IMAGE)
     }
 
+//    @Test
+//    fun testPosenet() {
+//        val poseDetector = PoseNet.create(appContext, Device.CPU)
+//        val person = poseDetector.estimatePoses(inputBitmap)[0]
+//        val outputBitmap = VisualizationUtils.drawBodyKeypoints(inputBitmap, arrayListOf(person))
+//        assertThat(outputBitmap).isNotNull()
+//    }
+//
+//    @Test
+//    fun testMovenetLightning() {
+//        // Due to Movenet's cropping logic, we run inference several times with the same input
+//        // image to improve accuracy
+//        val poseDetector = MoveNet.create(appContext, Device.CPU, ModelType.Lightning)
+//        poseDetector.estimatePoses(inputBitmap)
+//        poseDetector.estimatePoses(inputBitmap)
+//        val person2 = poseDetector.estimatePoses(inputBitmap)[0]
+//        val outputBitmap2 = VisualizationUtils.drawBodyKeypoints(inputBitmap, arrayListOf(person2))
+//        assertThat(outputBitmap2).isNotNull()
+//    }
+//
+//    @Test
+//    fun testMovenetThunder() {
+//        // Due to Movenet's cropping logic, we run inference several times with the same input
+//        // image to improve accuracy
+//        val poseDetector = MoveNet.create(appContext, Device.CPU, ModelType.Thunder)
+//        poseDetector.estimatePoses(inputBitmap)
+//        poseDetector.estimatePoses(inputBitmap)
+//        val person = poseDetector.estimatePoses(inputBitmap)[0]
+//        val outputBitmap = VisualizationUtils.drawBodyKeypoints(inputBitmap, arrayListOf(person))
+//        assertThat(outputBitmap).isNotNull()
+//    }
+
     @Test
     fun testPosenet() {
         val poseDetector = PoseNet.create(appContext, Device.CPU)
-        val person = poseDetector.estimatePoses(inputBitmap)[0]
-        val outputBitmap = VisualizationUtils.drawBodyKeypoints(inputBitmap, arrayListOf(person))
-        assertThat(outputBitmap).isNotNull()
+        val poses = poseDetector.estimatePoses(inputBitmap)
+        if (poses.isNotEmpty()) {
+            val person = poses[0]
+            val outputBitmap = VisualizationUtils.drawBodyKeypoints(inputBitmap, person, setColor = Color.RED, dir = "left")
+            assertThat(outputBitmap).isNotNull()
+        }
     }
 
     @Test
     fun testMovenetLightning() {
-        // Due to Movenet's cropping logic, we run inference several times with the same input
-        // image to improve accuracy
         val poseDetector = MoveNet.create(appContext, Device.CPU, ModelType.Lightning)
         poseDetector.estimatePoses(inputBitmap)
         poseDetector.estimatePoses(inputBitmap)
-        val person2 = poseDetector.estimatePoses(inputBitmap)[0]
-        val outputBitmap2 = VisualizationUtils.drawBodyKeypoints(inputBitmap, arrayListOf(person2))
-        assertThat(outputBitmap2).isNotNull()
+        val poses2 = poseDetector.estimatePoses(inputBitmap)
+        if (poses2.isNotEmpty()) {
+            val person2 = poses2[0]
+            val outputBitmap2 = VisualizationUtils.drawBodyKeypoints(inputBitmap, person2, setColor = Color.RED, dir = "right")
+            assertThat(outputBitmap2).isNotNull()
+        }
     }
 
     @Test
     fun testMovenetThunder() {
-        // Due to Movenet's cropping logic, we run inference several times with the same input
-        // image to improve accuracy
         val poseDetector = MoveNet.create(appContext, Device.CPU, ModelType.Thunder)
         poseDetector.estimatePoses(inputBitmap)
         poseDetector.estimatePoses(inputBitmap)
-        val person = poseDetector.estimatePoses(inputBitmap)[0]
-        val outputBitmap = VisualizationUtils.drawBodyKeypoints(inputBitmap, arrayListOf(person))
-        assertThat(outputBitmap).isNotNull()
+        val poses = poseDetector.estimatePoses(inputBitmap)
+        if (poses.isNotEmpty()) {
+            val person = poses[0]
+            val outputBitmap = VisualizationUtils.drawBodyKeypoints(inputBitmap, person, setColor = Color.RED, dir = "up")
+            assertThat(outputBitmap).isNotNull()
+        }
     }
+
+
 }

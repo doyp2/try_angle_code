@@ -123,7 +123,7 @@ class CameraSource(
     }
     private fun start_motor() {
         try {
-            socket_motor = Socket("192.168.112.109", 8888)
+            socket_motor = Socket("192.168.32.2", 8888)
             dataOutputStream_motor = DataOutputStream(socket_motor!!.getOutputStream())
             dataInputStream_motor = DataInputStream(socket_motor!!.getInputStream())
         } catch (e: Exception) {

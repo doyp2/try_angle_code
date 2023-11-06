@@ -52,6 +52,9 @@ import android.os.Environment
 import android.provider.MediaStore
 import java.util.Calendar
 import kotlin.system.exitProcess
+import androidx.core.app.ActivityCompat
+import java.util.Locale
+
 
 
 class MyApp : Application() {
@@ -73,6 +76,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val FRAGMENT_DIALOG = "dialog"
         var adjustMode = false
+        const val REQUEST_CODE = 100
     }
 
     /** A [SurfaceView] for camera preview.   */
@@ -167,14 +171,40 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         // *************** 버튼 이벤트 리스너 설정 함수
-        val adjustButton: Button = findViewById(R.id.adjustButton)
-        adjustButton.setOnClickListener {
-            showToast("버튼이 클릭되었습니다")
-            adjustMode = !adjustMode
+//        val adjustButton: Button = findViewById(R.id.adjustButton)
+//        adjustButton.setOnClickListener {
+//            showToast("버튼이 클릭되었습니다")
+//            adjustMode = !adjustMode
 //            if (adjustMode) {
 //                adjustPoints()
 //            }
+//        }
+
+//        // *************** 갤러리 이벤트 리스너 설정 함수
+//        val galleryButton = findViewById<Button>(R.id.gallery_button)
+//        galleryButton.setOnClickListener {
+//            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+//                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), REQUEST_CODE)
+//            } else {
+//                val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+//                startActivity(intent)
+//            }
+//        }
+
+        // *************** 갤러리 이벤트 리스너 설정 함수
+        val galleryButton = findViewById<ImageButton>(R.id.gallery_button)
+        galleryButton.setImageResource(R.drawable.ic_gallery_icon)
+
+        galleryButton.setOnClickListener {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), REQUEST_CODE)
+            } else {
+                val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+                startActivity(intent)
+            }
         }
+
+
 
         // *************** screenHeight 값을 설정
         screenHeight = resources.displayMetrics.heightPixels
@@ -506,6 +536,49 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
+//fun save_img(context: Context, bitmap: Bitmap) {
+//    val fileName = "test123"
+//    val format = Bitmap.CompressFormat.JPEG
+//    val rotateMatrix = Matrix()
+//    rotateMatrix.postRotate(270.0f)
+//    val rotatedBitmap = Bitmap.createBitmap(
+//        bitmap, 0, 0, 640, 480,
+//        rotateMatrix, false
+//    )
+//    saveImageToGallery(context, rotatedBitmap, fileName, format)
+//    exitProcess(0)
+//}
+//
+//private fun saveImageToGallery(context: Context, bitmap: Bitmap, fileName: String, format: Bitmap.CompressFormat): Uri? {
+//    val contentValues = ContentValues().apply {
+//        put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+//        put(MediaStore.MediaColumns.MIME_TYPE, "image/" + format.name.substring(format.name.lastIndexOf(".") + 1))
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+//            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
+//        }
+//    }
+//
+//    val contentUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+//        MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+//    } else {
+//        MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+//    }
+//
+//    val imageUri = context.contentResolver.insert(contentUri, contentValues)
+//
+//    imageUri?.let {
+//        context.contentResolver.openOutputStream(it)?.use { outputStream ->
+//            bitmap.compress(format, 100, outputStream)
+//        }
+//    } ?: return null
+//
+//    // 갤러리에 추가
+//
+//    context.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, imageUri))
+//
+//    return imageUri
+//}
+
 fun save_img(context: Context, bitmap: Bitmap) {
     val fileName = "test123"
     val format = Bitmap.CompressFormat.JPEG
@@ -522,7 +595,7 @@ fun save_img(context: Context, bitmap: Bitmap) {
 private fun saveImageToGallery(context: Context, bitmap: Bitmap, fileName: String, format: Bitmap.CompressFormat): Uri? {
     val contentValues = ContentValues().apply {
         put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-        put(MediaStore.MediaColumns.MIME_TYPE, "image/" + format.name.substring(format.name.lastIndexOf(".") + 1))
+        put(MediaStore.MediaColumns.MIME_TYPE, "image/" + format.name.toLowerCase(Locale.ROOT))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
         }
@@ -541,10 +614,6 @@ private fun saveImageToGallery(context: Context, bitmap: Bitmap, fileName: Strin
             bitmap.compress(format, 100, outputStream)
         }
     } ?: return null
-
-    // 갤러리에 추가
-
-    context.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, imageUri))
 
     return imageUri
 }
